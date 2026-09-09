@@ -4,7 +4,7 @@ A task-routed manipulation harness that combines a frozen Qwen vision-language m
 
 The latest completed evaluation achieved **5 successes out of 10 tasks (50%)**, compared with **2/10 (20%)** in the earlier ten-task baseline. Both use the original seed-7 pick-and-place scenes and a budget of 900 simulator actions per task. The latest cohort took **20.0 minutes**, used **6,196 simulator actions**, and made **132 Qwen calls**.
 
-**[Evaluation report](reports/EVALUATION.md) · [Watch all ten recordings](https://utjiachenli2001.github.io/qwen-robocasa-harness/) · [Raw results](results/fullten-r1/summary.json) · [Video files](videos/)**
+**[Evaluation report](reports/EVALUATION.md) · [Watch all ten recordings](https://gimai-dev.github.io/qwen-robocasa-harness/) · [Raw results](results/fullten-r1/summary.json) · [Video files](videos/)**
 
 ## What this project does
 
@@ -101,7 +101,7 @@ The shared runtime contains historical support modules as well as the active mod
 ### Inspect results and videos on any computer
 
 ```sh
-git clone https://github.com/utjiachenli2001/qwen-robocasa-harness.git
+git clone https://github.com/gimai-dev/qwen-robocasa-harness.git
 cd qwen-robocasa-harness
 python3 -m json.tool results/fullten-r1/summary.json
 ```
