@@ -1,0 +1,160 @@
+{
+  "memory": "/home/jli/state/recovery-20260908/restored-memory.json",
+  "seed": 7,
+  "actions_per_episode": 900,
+  "routes": [
+    {
+      "task": "PickPlaceCounterToDrawer",
+      "code": "/home/jli/work/recovery-cohort-20260908/PickPlaceCounterToDrawer",
+      "entry": "legacy",
+      "args": [
+        "--candidate",
+        "bowl",
+        "--perception",
+        "sam2",
+        "--approach",
+        "direct",
+        "--release-clearance",
+        ".22",
+        "--place"
+      ],
+      "development_success": "baseline-PickPlaceCounterToDrawer",
+      "reproduced_success": "reproduce-PickPlaceCounterToDrawer",
+      "source_code": "/home/jli/work/qwen-workflow-skills/b9fe2dd861a670aa"
+    },
+    {
+      "task": "PickPlaceCounterToStandMixer",
+      "code": "/home/jli/work/recovery-cohort-20260908/PickPlaceCounterToStandMixer",
+      "entry": "legacy",
+      "args": [
+        "--candidate",
+        "object",
+        "--depth-offset",
+        "0.01",
+        "--perception",
+        "sam2",
+        "--approach",
+        "side_horizontal",
+        "--release-clearance",
+        "0.3",
+        "--side-clearance",
+        "0.07",
+        "--operation",
+        "pick_place",
+        "--side-offset",
+        "0.25",
+        "--base-backoff",
+        "0.0",
+        "--grasp-down-angle",
+        "30.0",
+        "--transfer-clearance",
+        "0.3",
+        "--approach-height",
+        "0.74",
+        "--place"
+      ],
+      "development_success": "baseline-PickPlaceCounterToStandMixer",
+      "reproduced_success": "reproduce-PickPlaceCounterToStandMixer",
+      "source_code": "/home/jli/work/qwen-workflow-v5-recovery/30a8783d522e02aa"
+    },
+    {
+      "task": "PickPlaceCounterToSink",
+      "code": "/home/jli/work/recovery-cohort-20260908/PickPlaceCounterToSink",
+      "entry": "modern",
+      "args": [],
+      "reproduced_success": "reproduce-PickPlaceCounterToSink",
+      "memory": "/home/jli/state/recovery-20260908/restored-memory.json",
+      "source_code": "/home/jli/work/recovery-validated-20260908/sink"
+    },
+    {
+      "task": "PickPlaceStoveToCounter",
+      "code": "/home/jli/work/recovery-cohort-20260908/PickPlaceStoveToCounter",
+      "entry": "modern",
+      "args": [
+        "--base-backoff",
+        ".15"
+      ],
+      "reproduced_success": "reproduce-PickPlaceStoveToCounter",
+      "memory": "/home/jli/state/recovery-20260908/restored-memory.json",
+      "source_code": "/home/jli/work/recovery-validated-20260908/stove"
+    },
+    {
+      "task": "PickPlaceSinkToCounter",
+      "code": "/home/jli/work/recovery-cohort-20260908/PickPlaceSinkToCounter",
+      "entry": "modern",
+      "args": [
+        "--base-backoff",
+        ".15",
+        "--grasp-height-offset",
+        ".02"
+      ],
+      "development_success": "garlic-receiver-anchor",
+      "memory": "/home/jli/state/recovery-20260908/restored-memory.json",
+      "reproduced_success": "reproduce-PickPlaceSinkToCounter",
+      "source_code": "/home/jli/work/recovery-validated-20260908/garlic"
+    },
+    {
+      "task": "PickPlaceDrawerToCounter",
+      "code": "/home/jli/work/recovery-cohort-20260908/PickPlaceDrawerToCounter",
+      "entry": "modern",
+      "args": [
+        "--base-backoff",
+        ".30",
+        "--grasp-candidate",
+        "handle"
+      ],
+      "memory": "/home/jli/state/recovery-20260908/restored-memory.json",
+      "status": "experimental, not reproduced success",
+      "source_code": "/home/jli/work/recovery-whisk-inset-20260908"
+    },
+    {
+      "task": "PickPlaceCabinetToCounter",
+      "code": "/home/jli/work/recovery-cohort-20260908/PickPlaceCabinetToCounter",
+      "entry": "modern",
+      "args": [
+        "--base-backoff",
+        ".15"
+      ],
+      "memory": "/home/jli/state/recovery-20260908/restored-memory.json",
+      "status": "experimental, not reproduced success",
+      "source_code": "/home/jli/work/recovery-front-source-20260908"
+    },
+    {
+      "task": "PickPlaceCounterToCabinet",
+      "code": "/home/jli/work/recovery-cohort-20260908/PickPlaceCounterToCabinet",
+      "entry": "modern",
+      "args": [
+        "--base-backoff",
+        ".15"
+      ],
+      "memory": "/home/jli/state/recovery-20260908/restored-memory.json",
+      "status": "experimental, not reproduced success",
+      "source_code": "/home/jli/work/recovery-cabinet-stepped-20260908"
+    },
+    {
+      "task": "PickPlaceCounterToMicrowave",
+      "code": "/home/jli/work/recovery-cohort-20260908/PickPlaceCounterToMicrowave",
+      "entry": "modern",
+      "args": [
+        "--base-backoff",
+        ".15"
+      ],
+      "memory": "/home/jli/state/recovery-20260908/restored-memory.json",
+      "status": "experimental, not reproduced success",
+      "source_code": "/home/jli/work/recovery-targeted-view-20260908"
+    },
+    {
+      "task": "PickPlaceMicrowaveToCounter",
+      "code": "/home/jli/work/recovery-cohort-20260908/PickPlaceMicrowaveToCounter",
+      "entry": "modern",
+      "args": [
+        "--base-backoff",
+        ".15"
+      ],
+      "memory": "/home/jli/state/recovery-20260908/restored-memory.json",
+      "status": "experimental, not reproduced success",
+      "source_code": "/home/jli/work/recovery-front-source-20260908"
+    }
+  ],
+  "evaluation": "One frozen portfolio, original ten tasks, seed 7, one attempt per task; experimental failures remain in denominator."
+}

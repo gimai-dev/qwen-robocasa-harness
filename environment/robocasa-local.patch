@@ -1,0 +1,191 @@
+diff --git a/robocasa/models/objects/objects.py b/robocasa/models/objects/objects.py
+index 413e8aa..e3be638 100644
+--- a/robocasa/models/objects/objects.py
++++ b/robocasa/models/objects/objects.py
+@@ -1,6 +1,9 @@
+ import os
+-import time
++import json
++import tempfile
+ import xml.etree.ElementTree as ET
++from functools import lru_cache
++from pathlib import Path
+ 
+ import numpy as np
+ import robosuite
+@@ -10,6 +13,109 @@ from robosuite.models.base import MujocoXML
+ from robosuite.utils.mjcf_utils import array_to_string, string_to_array, find_elements
+ 
+ 
++_FILE_TAG_BASE = {
++    "mesh": "meshdir",
++    "texture": "texturedir",
++    "hfield": "assetdir",
++    "skin": "assetdir",
++}
++
++
++def _required_directory(variable):
++    raw = os.environ.get(variable)
++    if not raw:
++        raise RuntimeError(f"{variable} is required")
++    path = Path(raw)
++    if not path.is_absolute():
++        raise RuntimeError(f"{variable} must be absolute")
++    return path.resolve(strict=True)
++
++
++@lru_cache(maxsize=1)
++def _asset_authority():
++    asset_root = _required_directory("ROBOCASA_ASSET_ROOT")
++    manifest_path = Path(os.environ.get("ROBOCASA_ASSET_MANIFEST", ""))
++    if not manifest_path.is_absolute() or not manifest_path.is_file():
++        raise RuntimeError("ROBOCASA_ASSET_MANIFEST must be an absolute regular file")
++    with manifest_path.open(encoding="utf-8") as stream:
++        records = json.load(stream)
++    paths = frozenset(record["path"] for record in records)
++    return asset_root, paths
++
++
++def _episode_temp_directory():
++    temp_root = _required_directory("ROBOCASA_EPISODE_TMPDIR")
++    run_root = _required_directory("ROBOCASA_RUN_DIR")
++    checkout_root = _required_directory("ROBOCASA_CHECKOUT_ROOT")
++    cache_root = _required_directory("ROBOCASA_CACHE_ROOT")
++    metadata = temp_root.stat()
++    if metadata.st_uid != os.getuid() or (metadata.st_mode & 0o777) != 0o700:
++        raise RuntimeError("episode temp directory must be uid-owned mode 0700")
++    if not temp_root.is_relative_to(run_root):
++        raise RuntimeError("episode temp directory must be inside the run directory")
++    if temp_root.is_relative_to(checkout_root) or temp_root.is_relative_to(cache_root):
++        raise RuntimeError("episode temp directory overlaps an immutable root")
++    if any(temp_root.iterdir()):
++        raise RuntimeError("episode temp directory is not empty")
++    return temp_root
++
++
++def _canonicalize_asset_paths(xml_str, source_xml_path):
++    source_path = Path(source_xml_path).resolve(strict=True)
++    asset_root, manifest_paths = _asset_authority()
++    if not source_path.is_relative_to(asset_root):
++        raise RuntimeError("object XML is outside the locked asset root")
++    root = ET.fromstring(xml_str)
++    if root.findall(".//include"):
++        raise RuntimeError("included XML is not supported by the locked corpus")
++
++    compiler = root.find("compiler")
++    if compiler is None:
++        compiler = ET.Element("compiler")
++        root.insert(0, compiler)
++    strippath = compiler.get("strippath")
++    if strippath is not None and strippath.lower() not in {"false", "0"}:
++        raise RuntimeError("compiler strippath must be false")
++    compiler.set("strippath", "false")
++
++    source_directory = source_path.parent
++    bases = {}
++    assetdir = compiler.get("assetdir")
++    asset_base = source_directory if assetdir is None else source_directory / assetdir
++    for attribute in ("assetdir", "meshdir", "texturedir"):
++        value = compiler.get(attribute)
++        base = asset_base if value is None else source_directory / value
++        resolved = base.resolve(strict=True)
++        if not resolved.is_relative_to(asset_root):
++            raise RuntimeError(f"compiler {attribute} escapes the locked asset root")
++        bases[attribute] = resolved
++        if value is not None:
++            compiler.set(attribute, str(resolved))
++
++    resolved_references = []
++    for element in root.iter():
++        value = element.get("file")
++        if value is None:
++            continue
++        base_attribute = _FILE_TAG_BASE.get(element.tag)
++        if base_attribute is None:
++            raise RuntimeError(f"unrecognized file-bearing element: {element.tag}")
++        candidate = Path(value)
++        resolved = (
++            candidate.resolve(strict=True)
++            if candidate.is_absolute()
++            else (bases[base_attribute] / candidate).resolve(strict=True)
++        )
++        if not resolved.is_relative_to(asset_root):
++            raise RuntimeError(f"asset reference escapes the locked root: {value}")
++        relative = resolved.relative_to(asset_root).as_posix()
++        if relative not in manifest_paths:
++            raise RuntimeError(f"asset reference is not manifest-bound: {relative}")
++        element.set("file", str(resolved))
++        resolved_references.append((element.tag, value, relative))
++    return ET.tostring(root, encoding="utf8").decode("utf8"), resolved_references
++
++
+ class MujocoXMLObjectRobocasa(MujocoXMLObject):
+     def set_scale(self, scale, obj=None):
+         """
+@@ -237,32 +343,45 @@ class MJCFObject(MujocoXMLObjectRobocasa):
+         # read default xml
+         xml_path = mjcf_path
+         self.mjcf_path = mjcf_path
+-        folder = os.path.dirname(xml_path)
+         tree = ET.parse(xml_path)
+         root = tree.getroot()
+ 
+-        # write modified xml (and make sure to postprocess any paths just in case)
++        # Write the modified XML outside the immutable asset tree while preserving
++        # the original adjacent-file path semantics explicitly.
+         xml_str = ET.tostring(root, encoding="utf8").decode("utf8")
+         xml_str = self.postprocess_model_xml(xml_str)
+-        time_str = str(time.time()).replace(".", "_")
+-        new_xml_path = os.path.join(folder, "{}_{}.xml".format(time_str, os.getpid()))
+-        f = open(new_xml_path, "w")
+-        f.write(xml_str)
+-        f.close()
+-
+-        # initialize object with new xml we wrote
+-        super().__init__(
+-            fname=new_xml_path,
+-            name=name,
+-            joints=[dict(type="free", damping="0.0005")],
+-            obj_type="all",
+-            duplicate_collision_geoms=False,
+-            scale=scale,
++        xml_str, self.resolved_asset_references = _canonicalize_asset_paths(
++            xml_str, xml_path
+         )
+-
+-        # clean up xml - we don't need it anymore
+-        if os.path.exists(new_xml_path):
+-            os.remove(new_xml_path)
++        temp_root = _episode_temp_directory()
++        new_xml_path = None
++        try:
++            with tempfile.NamedTemporaryFile(
++                mode="w",
++                encoding="utf-8",
++                prefix="robocasa-object-",
++                suffix=".xml",
++                dir=temp_root,
++                delete=False,
++            ) as temporary:
++                new_xml_path = temporary.name
++                os.chmod(new_xml_path, 0o600)
++                temporary.write(xml_str)
++                temporary.flush()
++                os.fsync(temporary.fileno())
++
++            # Initialize the object using the same consumer and arguments.
++            super().__init__(
++                fname=new_xml_path,
++                name=name,
++                joints=[dict(type="free", damping="0.0005")],
++                obj_type="all",
++                duplicate_collision_geoms=False,
++                scale=scale,
++            )
++        finally:
++            if new_xml_path is not None and os.path.exists(new_xml_path):
++                os.remove(new_xml_path)
+ 
+         self._regions = dict()
+         self._setup_region_dict()

@@ -1,0 +1,172 @@
+[
+  {
+    "task": "PickPlaceCabinetToCounter",
+    "path": "videos/PickPlaceCabinetToCounter.mp4",
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "width": 768,
+        "height": 256,
+        "r_frame_rate": "4/1"
+      }
+    ],
+    "format": {
+      "duration": "5.750000"
+    }
+  },
+  {
+    "task": "PickPlaceCounterToCabinet",
+    "path": "videos/PickPlaceCounterToCabinet.mp4",
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "width": 768,
+        "height": 256,
+        "r_frame_rate": "4/1"
+      }
+    ],
+    "format": {
+      "duration": "11.500000"
+    }
+  },
+  {
+    "task": "PickPlaceCounterToDrawer",
+    "path": "videos/PickPlaceCounterToDrawer.mp4",
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "width": 768,
+        "height": 256,
+        "r_frame_rate": "4/1"
+      }
+    ],
+    "format": {
+      "duration": "11.750000"
+    }
+  },
+  {
+    "task": "PickPlaceCounterToMicrowave",
+    "path": "videos/PickPlaceCounterToMicrowave.mp4",
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "width": 768,
+        "height": 256,
+        "r_frame_rate": "4/1"
+      }
+    ],
+    "format": {
+      "duration": "14.750000"
+    }
+  },
+  {
+    "task": "PickPlaceCounterToSink",
+    "path": "videos/PickPlaceCounterToSink.mp4",
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "width": 768,
+        "height": 256,
+        "r_frame_rate": "4/1"
+      }
+    ],
+    "format": {
+      "duration": "5.250000"
+    }
+  },
+  {
+    "task": "PickPlaceCounterToStandMixer",
+    "path": "videos/PickPlaceCounterToStandMixer.mp4",
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "width": 768,
+        "height": 256,
+        "r_frame_rate": "4/1"
+      }
+    ],
+    "format": {
+      "duration": "9.250000"
+    }
+  },
+  {
+    "task": "PickPlaceDrawerToCounter",
+    "path": "videos/PickPlaceDrawerToCounter.mp4",
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "width": 768,
+        "height": 256,
+        "r_frame_rate": "4/1"
+      }
+    ],
+    "format": {
+      "duration": "5.500000"
+    }
+  },
+  {
+    "task": "PickPlaceMicrowaveToCounter",
+    "path": "videos/PickPlaceMicrowaveToCounter.mp4",
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "width": 768,
+        "height": 256,
+        "r_frame_rate": "4/1"
+      }
+    ],
+    "format": {
+      "duration": "14.750000"
+    }
+  },
+  {
+    "task": "PickPlaceSinkToCounter",
+    "path": "videos/PickPlaceSinkToCounter.mp4",
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "width": 768,
+        "height": 256,
+        "r_frame_rate": "4/1"
+      }
+    ],
+    "format": {
+      "duration": "12.750000"
+    }
+  },
+  {
+    "task": "PickPlaceStoveToCounter",
+    "path": "videos/PickPlaceStoveToCounter.mp4",
+    "programs": [],
+    "stream_groups": [],
+    "streams": [
+      {
+        "codec_name": "h264",
+        "width": 768,
+        "height": 256,
+        "r_frame_rate": "4/1"
+      }
+    ],
+    "format": {
+      "duration": "10.250000"
+    }
+  }
+]

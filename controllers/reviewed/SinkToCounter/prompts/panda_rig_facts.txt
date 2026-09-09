@@ -1,0 +1,340 @@
+# Embodiment notes
+
+One controlled seven-axis Franka Emika Panda right arm with a parallel-jaw
+gripper on an Omron mobile base; the torso is fixed at zero and there is no
+second arm. The robot-base frame is right-handed: +x forward, +y left, +z up.
+Public FK, both Jacobians, `cartesian_delta`, and every receipt use that
+frame. Public quaternions are xyzw.
+Joint guide (positive direction, absolute radians, hard limits in brackets):
+- `joint1` [-2.8973, 2.8973]: base pan about +z; positive swings the whole arm
+  counterclockwise seen from above and sets the horizontal bearing.
+- `joint2` [-1.7628, 1.7628]: shoulder lift; positive leans the upper arm
+  forward (+x) and lowers the wrist; negative leans it back and raises it.
+- `joint3` [-2.8973, 2.8973]: upper-arm roll; rotates the elbow plane out of
+  the vertical bearing plane and couples position with tool orientation.
+- `joint4` [-3.0718, -0.0698]: elbow; always negative. Toward -0.07 the arm
+  straightens (longer reach); toward -3.07 the forearm folds back.
+- `joint5` [-2.8973, 2.8973]: forearm roll; rolls the wrist assembly and moves
+  the offset grip site slightly.
+- `joint6` [-0.0175, 3.7525]: wrist flex; with `joint2 - joint4 - joint6 = 0`
+  the tool points straight down, and increasing `joint6` pitches the tool
+  forward toward +x.
+- `joint7` [-2.8973, 2.8973]: wrist roll about the tool axis; it rolls the
+  finger gap and does not move the grip site (its translation Jacobian column
+  is zero).
+- `gripper`: normalized 1.0 open, 0.0 closed; `open|hold|close` intent inside
+  `cartesian_delta` and `image_servo`.
+Every explicit joint target stays at least 0.02 rad inside its limit.
+Proportions: shoulder axis 0.333 m above the base; upper arm 0.3266 m (0.316 m
+with a 0.0825 m elbow offset); forearm 0.3928 m (0.384 m with the opposite
+0.0825 m offset); wrist-flex axis to `grip_site` 0.2217 m (0.088 m offset plus
+0.2035 m along the tool axis). Reach from the shoulder to the wrist axis is at
+most 0.7194 m. `grip_site` is the kinematic reference of
+`state.end_effector_position_relative`; it sits between the fingers, not at
+the fingertips, and is never the target object's location.
+
+# Rig facts
+
+## Gripper
+- `gripper_residual.measured_end_finger_separation` reads about 0.079 m fully
+  open and about 0.0024 m when the fingers close on nothing. Contact requires
+  a settled value strictly greater than 0.0032 m; in between is empty. A first
+  obstruction above 0.0032 m is provisional while finger `qpos_delta` exceeds
+  0.002; one stationary close-only repeat confirms or clears it.
+- The fingers close along `grip_site` local +y. In the base frame that axis
+  is the second column of the rotation given by
+  `state.end_effector_rotation_relative`. `joint7` rolls that axis about the
+  tool axis; a change of about pi/2 in `joint7` swaps it with local +x. A
+  thin bar is held only when the gap axis crosses the bar's long axis; when
+  the gap is parallel to the bar the fingers slide past it and the close reads
+  empty even with a perfect pixel.
+
+## Cameras and pixels
+- `left` and `right` are fixed external cameras; `wrist` moves with the
+  gripper. Images are 256 px square and carry the 32-pixel grid; `[0,0]` is
+  the upper-left corner, `u` right, `v` down. To read a pixel, count the
+  yellow vertical lines to the left of the feature (32 px each) and add the
+  fraction of the next cell for `u`; count cyan horizontal lines above it for
+  `v`. A target pixel always comes from a visible feature you have located
+  this way; `[128,128]` is the image centre, not a target.
+- `state.end_effector_external_pixels` publishes the projected `grip_site`
+  for each external camera as `u_px`, `v_px`, `visible`, `depth_valid`. It is
+  where the gripper is, never where the target is. `image_servo` steers that
+  pixel toward your `target_pixel`; insertion is allowed once they are within
+  8 pixels.
+- Each accepted `image_servo` moves along the camera ray in `step_m`
+  increments of 0.005 to 0.03 m, at most four increments and 0.08 m per
+  command (0.15 m with a stereo target: give both pixels with `step_m=0.03`
+  and keep the SAME pixel pair every command until the grip-site pixel is
+  within 8 px; changing the pair moves the 3D point and wastes commands); `articulation_motion` uses one increment. Positive `depth_delta_m`
+  moves away from the selected camera, negative toward it.
+- Pixel scale at the working depth is roughly 3 to 5 pixels per centimetre in
+  the external views (a 3.4 cm grip-site move displaced the right-view pixel
+  by 12 px). It changes with depth; calibrate it from
+  `end_effector_external_pixel_displacement` against
+  `end_effector_pose_delta` in your own receipts, never from memory.
+- Thin dark horizontal pulls on appliance doors read as a dark bar a few
+  tens of px long and under 10 px tall in the external views; the door panel
+  around them is broad and lighter. Put a handle pixel on the interior
+  midline of the dark bar, not on the panel, gap, or end cap: from a box
+  `u_min..u_max, v_min..v_max` take `u = (u_min + u_max) / 2` and
+  `v = (v_min + v_max) / 2`. A pixel within 8 px of either end is rejected
+  as an end cap, and a close there misses the bar. When a handle pixel is
+  rejected, the rejection names the `u`/`v` span of the dark bar it detected
+  in that view; choose your next pixel at the midpoint of that span.
+- Several thin bars are usually detected per view. The door pull sits on the
+  door face at roughly mid-height of the appliance; a bar along the
+  appliance's bottom edge is its base or foot, a bar along the top edge is
+  normally the lid seam, and distant bars are counter or cabinet edges.
+  In the seed-7 scene the pull is the bar whose vertical position is between
+  the appliance's top seam and its base, in both views at the same height.
+- An open gripper whose measured finger separation drops below 0.075 m during
+  an insertion is being pushed by the handle: that obstruction counts as
+  insertion-ready, so a stationary close is allowed even when the selected
+  view's pixel error is still above 8 px.
+- `other_view_pixel` must be the OBJECT seen in the other camera, never the
+  published grip-site pixel of that camera (that is where the gripper is).
+  If you cannot find the object in the other view, use `null`.
+- One view is not enough for depth. Alignment of the projected grip site with
+  the pull in one external view fixes two coordinates; the third (depth along
+  that camera's ray) is only confirmed when the grip site also lies on the
+  pull in the other external view (`state.end_effector_external_pixels`).
+  In the seed-7 episodes both empty closes happened with the grip site within
+  3 px of the pull in the right view and more than 80 px off it in the left
+  view: the fingers closed above and in front of the bar. The direct fix is a
+  stereo target: give `target_pixel` in the selected view and
+  `other_view_pixel` for the same point in the other view, and the harness
+  intersects the two rays. Close only when both views agree.
+
+## Controller behaviour
+- Targets are absolute positions. The harness interpolates at most 0.025 rad
+  per low-level action, pauses when tracking lag reaches 0.05 rad, and caps an
+  arm command at 32 actions; a gripper transition reserves at least 16
+  actions. A far request undershoots when the cap is hit: read
+  `endpoint_error`, `tracking_pause_count`, `maximum_commanded_step`, and
+  `realized_arm_qpos_delta`, then re-issue the same target rather than
+  overshooting.
+- A `joint7` roll is settled only when the receipt shows position error at or
+  below 0.05 rad and end `joint7` velocity below 0.01 rad/s. One roll reached
+  0.047 rad of error while still moving at 0.17 rad/s; that is not settled.
+  Repeat the exact same Qwen-authored target until it settles; do not pick a
+  new target or resume image servo first.
+- In the seed-7 toaster episodes an `image_servo` step used about 18 actions
+  and moved the grip site 2 to 3.5 cm; a joint command used 16 to 32 actions.
+  A 450-action episode therefore holds roughly 14 to 24 physical commands, so
+  an approach that needs more than about 10 servo steps will not leave room
+  for engagement and actuation.
+
+## Effort and wrench
+- `state.arm_applied_torque` is seven controller torques in N m and is
+  gravity-loaded: in the seed-7 approach pose `joint2` held about 14, `joint3`
+  about 7, and `joint4` about 9 N m at rest. Compare deltas against the
+  moving baseline of your own recent receipts, not against zero.
+- `state.end_effector_wrench` gives `force_n` and `torque_nm`;
+  `telemetry_summary` reports start, end, delta, and peak per command for
+  torque, joint position, joint velocity, and wrench.
+- An empty stationary close changed every joint torque by less than 0.6 N m
+  and the wrench force by less than 0.05 N. That is the no-contact baseline: a
+  real handle contact shows a finger separation above 0.0032 m together with a
+  wrench delta clearly above it. No single signal proves contact; require
+  agreement between the residual, the wrench, and fresh RGB change.
+
+## Receipts
+- Every physical command returns one sealed receipt paired with the next
+  observation. Read `requested_targets` or the requested Cartesian/servo
+  fields, `bounded_endpoint`, `realized_arm_qpos`, `realized_arm_qpos_delta`,
+  `end_effector_pose_delta`, `end_effector_external_pixel_displacement`,
+  `endpoint_error`, `minimum_hard_limit_margin`, `step_count`,
+  `gripper_residual`, `telemetry_summary`, and `mean_absolute_rgb_change`.
+  For a base pulse read `remaining_endpoint_error`.
+- Receipts are episode-local: never reuse a pose, pixel scale, or torque
+  baseline from another episode, and never act on a receipt that does not
+  belong to the current `observation_id`.
+
+# Rig formulas
+
+Planar arm kinematics in the vertical plane through the base bearing, from
+the installed Panda model with `joint1 = joint3 = joint5 = joint7 = 0`.
+Constants: L0 = 0.333 (shoulder height), L1 = 0.3266, a1 = 0.2554,
+L2 = 0.3928, a2 = 0.2116, L3 = 0.2217, a3 = 0.4081 (metres and radians).
+Angles are measured from +z toward +x (forward):
+- A = joint2 + a1 (upper arm), B = joint2 - joint4 - a2 (forearm),
+  phi = joint2 - joint4 - joint6 (tool pitch: 0 points straight down, -pi/2
+  points forward), C = phi + pi - a3 (wrist-to-grip-site segment).
+- Forward: x = L1 sin A + L2 sin B + L3 sin C and
+  z = L0 + L1 cos A + L2 cos B + L3 cos C. Rotate (x, z) by `joint1` about +z
+  for the base-frame position; this reproduces the installed FK exactly in
+  the planar configuration.
+- Inverse for a target (x, z, phi): W = (x, z) - L3 (sin C, cos C);
+  P = W - (0, L0); d = |P| must satisfy d <= L1 + L2 = 0.7194; then
+  A = atan2(P_x, P_z) - acos((d^2 + L1^2 - L2^2) / (2 L1 d)),
+  joint2 = A - a1, B = atan2(W_x - L1 sin A, W_z - L0 - L1 cos A),
+  joint4 = joint2 - a2 - B, joint6 = joint2 - joint4 - phi. This minus sign
+  is the elbow-back branch the Panda uses; it gives a legal negative `joint4`
+  in nearly every working pose, and the plus branch is the alternative when it
+  does not.
+- Accuracy: exact in the planar configuration. With the real out-of-plane
+  values from the seed-7 approach (`joint3 = -0.33`, `joint5 = -0.21`) the
+  planar estimate was 10 cm off, so use the formulas for direction, scale,
+  reachability, and a first joint set, then correct with the fresh public
+  Jacobian and the realized receipt. For an accepted `cartesian_delta` the
+  harness already applies one fixed damped least-squares solve of your six
+  base-frame values through `state.arm_translation_jacobian` and
+  `state.arm_rotation_jacobian`; predict the effect from the same matrices.
+- Finger-gap orientation: read the current gap axis from the second column of
+  `state.end_effector_rotation_relative`; to cross a horizontal bar that runs
+  along base y while approaching from above, the gap must lie near base x.
+  With `joint7 = -0.24` in the seed-7 approach pose the gap read near
+  `[0.88, 0.38, 0.29]`. Choose the absolute `joint7` target yourself with
+  at least 0.02 rad of limit margin.
+
+# Rig advice
+
+Working practice distilled from the seed-7 toaster episodes on this rig.
+
+## Calibrate before you commit
+- The episode starts with the arm still settling: a first `move_joints` with
+  only `gripper` lets `state.arm_joint_velocity` reach zero and gives a clean
+  torque and wrench baseline in the first receipt.
+- One small reversible `cartesian_delta` or the first `image_servo` step
+  calibrates pixel scale: divide `end_effector_external_pixel_displacement`
+  by the realized `end_effector_pose_delta`, not by the requested motion.
+- Prefer a coordinated sparse joint set from the planar solution over nudging
+  single joints when the target is far; prefer `image_servo` once the target
+  and the projected grip site share an external view.
+
+## Keep the target in view
+- Cross-check the handle in both external views and name the local visible
+  part under the pixel in the note. If the projected grip-site pixel is off
+  image, depth-invalid, or the target is occluded, retreat with a bounded open
+  `cartesian_delta` and relocalize from fresh RGB; never close on a remembered
+  pixel.
+- Once chosen, keep the same camera and `target_pixel` fixed across servo
+  steps until its stationary close tests contact; local drift of the grip-site
+  pixel is not relocalization.
+
+## Approach geometry for a pull on a vertical face
+- A pull on a door face cannot be reached from above: with the tool pointing
+  down the gripper body meets the appliance's top edge first. In the seed-7
+  episodes the stereo servo converged to the right pixel and then stalled 18
+  px above the bar with under 5 mm realized per command. Come as
+  horizontally as the arm allows: a full -pi/2 tool pitch is NOT reachable
+  here (it needs joint6 beyond its 3.75 rad limit at radii of 0.35 to 0.55 m);
+  phi = joint2 - joint4 - joint6 of about -1.0 to -1.2 rad (tool 30 to 20
+  degrees below horizontal, approach axis near [0.9, 0, -0.4]) is reachable
+  with joint6 near 2.7 to 3.1 rad. Put the finger gap vertical (second
+  column of `state.end_effector_rotation_relative` near +-z), then approach
+  along +x slightly downward.
+- Only after a sealed toaster front-pull approach stalls within 20 pixels,
+  probe the door top edge already between the fingers: author a stationary
+  close now with only `gripper: 0.0`; do not repeat, do not re-orient, and do
+  not move the arm first. If contact is confirmed, first actuate with a
+  zero-depth downward image waypoint within 16 px and inspect its receipt.
+- Wrist rolls are expensive on this rig: `joint7` tracks at only about
+  0.3 rad/s, so a quarter turn costs about four 32-action commands (a
+  third of the episode). Set the finger gap you want in the ready pose
+  (one command) and avoid later rolls; for the seed-7 pull, which runs
+  along base y, the default gap near base x already straddles it, so do
+  not roll unless a close has proven the gap wrong.
+- Only after the harness reports `APPROACH_STALL_CONTEXT` (or after an
+  empty close with both views agreeing) author the re-orientation as one
+  `move_joints` from the planar formulas: keep the current radius and height,
+  solve `joint2`, `joint4`, `joint6` for phi = -1.1 at your own r and z
+  (a pitch of -0.4 is not a re-orientation: the tool still points down and
+  the same stall repeats), check every value is 0.02 rad inside its limit,
+  then choose `joint7` for a vertical gap, gripper `1.0`. Do not re-orient during the approach; the
+  stereo servo is cheaper while the grip site is still moving. Expect
+  undershoot; re-issue the same targets once if the receipt shows tracking
+  error above 0.05 rad. A `joint7` change of a quarter turn costs about three
+  32-action commands on this rig; budget for it.
+- When two consecutive servos toward one target realize under 6 mm, stop
+  servoing; the harness marks the approach stalled and rejects a repeat.
+- Ready pose first: the episode starts with the arm still moving and often
+  nearly straight (`joint4` above -0.5 rad). A straight arm cannot move
+  forward-and-down, so before the first servo author one `move_joints` to a
+  bent ready pose that keeps reach in every direction, about `joint2 -0.5`,
+  `joint4 -1.5`, `joint6 1.5`, gripper `1.0`. A joint command realizes at
+  most about 0.5 rad per 32-action command, so this pose takes two commands;
+  do not chase the exact target beyond that, start the stereo servo as soon
+  as `joint4` is below -1.0. Skip the ready pose entirely if `joint4` is
+  already below -1.0.
+- Reach: when `joint4` rises above about -0.3 rad the arm is nearly straight
+  and no Cartesian or servo command can extend it further (the rejection
+  names `joint4 endpoint is unsafe`). Gain reach with one `base_action`
+  (`x` forward at +0.25 for five steps moves the base a few centimetres; it
+  costs only 5 actions), then re-issue the same stereo target. Do this early
+  when the standing target is more than 0.5 m from the grip site.
+- The grip site sits about 5 cm above the fingertips along the tool axis;
+  a stereo target on the pull therefore parks the fingertips just below the
+  bar. Both stereo pixels must always name the SAME bar in both views (the
+  pull, at the same height in both images); never pair the pull in one view
+  with the base line in the other, that pair is rejected every time.
+- While a stereo servo is still converging (the receipt shows motion and the
+  grip-site pixel outside 8 px), the next decision is limited to another
+  stereo `image_servo`; Cartesian lifts and retreats are not offered.
+- After your first consistent stereo pair the harness publishes
+  `STANDING_STEREO_TARGET`: that 3D point projected into both fresh views.
+  Near the handle the bar detector often loses the pull behind the gripper,
+  so keep re-issuing those projected pixels (exempt from the pull gate)
+  instead of re-reading the bars, until the grip-site pixel is within 8 px.
+
+## Engaging a thin pull
+- Align the grip-site pixel within 8 px of a midline pixel on the dark bar,
+  insert with positive depth and the gripper `open`, then close without arm
+  motion (`move_joints` with only `targets={"gripper":0.0}`).
+- Before closing, check the other external view: if its grip-site pixel is
+  off the pull, keep the pixel and servo depth (nonzero `depth_delta_m`,
+  positive away from the camera) until the other view's pixel lands on the
+  pull; read `end_effector_external_pixel_displacement` for that view in each
+  receipt and flip the sign if the offset grows.
+- Read the close receipt. A separation above 0.0032 m with a wrench change is
+  contact: confirm with one stationary close-only repeat, then actuate. A
+  separation near 0.0024 m with both views agreeing means the gap was
+  parallel to the bar, not that the pixel was wrong. Never advance from
+  `engage` to `actuate` after this empty close: keep `milestone=engage`, reopen
+  before retrying, and retreat with one bounded open `cartesian_delta`; then
+  author `move_joints` with only `joint7` and
+  `gripper=1.0` to roll the gap across the bar, repeat that exact target until
+  the receipt shows it settled, and re-insert at a freshly screened pixel.
+  Hunting for a second pixel on a short bar wastes revisions.
+- A settled roll starts a new handle-contact epoch: earlier empty closes
+  explain the roll and no longer demand another retreat.
+
+## Pressing a button or switch (control tasks)
+- With `COFFEE_CONTACT_CORRECTION_READY_CONTEXT`, advance to `actuate` and
+  author one zero-depth stereo `image_servo`, gripper open, exact schema note.
+  Put each pixel 4.5-5.5 px left and 5-6 px down from its projection. This
+  correction is the press; inspect its force receipt, then retreat.
+- A button is pressed, not grasped. Align the grip site with the control
+  within 8 px, close to form a probe (about 0.0024 m is expected), advance to
+  `milestone=actuate`, then prefer a positive-depth `image_servo` of 0.01 to
+  0.03 m on the same `control_target` with gripper `close` to press along the
+  selected camera ray. Use bounded `cartesian_delta` only when the approach
+  direction is clear. Verify wrench or appliance RGB effect, then retreat.
+  For a knob or lever use `rotation_axis_angle_rad` or a tangential
+  translation while keeping contact.
+
+## Actuating
+- After confirmed contact keep the gripper `hold` or `close` and trace the
+  visible mechanism motion with `image_servo` `target_role=articulation_motion`:
+  first waypoint at most 16 px from the current grip-site pixel,
+  `depth_delta_m=0.0`, `step_m` 0.01 to 0.02, then read the receipt; once it
+  shows the mechanism moved with contact kept, use `step_m=0.03` per command
+  (a door needs 10 to 20 cm of handle travel and the action budget is finite).
+  Do not merely reverse the engagement ray; the camera ray is not the hinge
+  tangent. If contact is lost, re-engage and change the active axis set rather
+  than flipping a sign.
+
+## Notes and evidence
+- Keep every note under 320 characters (about 50 words); a longer note is
+  rejected without execution and a response that runs past the token limit
+  voids the whole episode.
+- Begin every note with `milestone=NAME; `, cite at least one exact public
+  field name you inspected (`state.arm_joint_velocity`,
+  `state.arm_translation_jacobian`, `state.arm_applied_torque`,
+  `endpoint_error`, `telemetry_summary`, `mean_absolute_rgb_change`, or
+  `gripper_residual`), state the predicted effect, and say what receipt value
+  would prove it wrong. Numbers in the note explain evidence; the command
+  fields carry the authored values.
+- Use only public images, public state, deterministic public transforms, and
+  sealed receipts; never request or infer hidden simulator truth.

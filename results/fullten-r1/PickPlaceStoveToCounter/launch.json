@@ -1,0 +1,18 @@
+[
+  "env",
+  "PYTHONDONTWRITEBYTECODE=1",
+  "PYTHONPATH=/home/jli/work/recovery-cohort-20260908/PickPlaceStoveToCounter:/home/jli/work/robocasa-inspect-official",
+  "QWEN_IDENTITY_MANIFEST=/home/jli/state/panda-qwen38/identity.json",
+  "QWEN_SERVER_ATTESTATION=/home/jli/state/panda-qwen38/server-attestation.json",
+  "QWEN_API_TOKEN_FILE=/home/jli/state/panda-qwen38/api-token",
+  "/home/jli/work/robocasa-inspect-official/.venv/bin/python",
+  "/home/jli/work/recovery-workflow-20260908/episode.py",
+  "--task",
+  "PickPlaceStoveToCounter",
+  "--run",
+  "/home/jli/state/recovery-fullten-r1-20260908/PickPlaceStoveToCounter",
+  "--memory",
+  "/home/jli/state/recovery-fullten-r1-20260908/PickPlaceStoveToCounter-memory-before.json",
+  "--base-backoff",
+  ".15"
+]

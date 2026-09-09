@@ -1,0 +1,396 @@
+{
+  "skills": [
+    {
+      "id": "PickPlaceCounterToDrawer-seed7",
+      "source_task": "PickPlaceCounterToDrawer",
+      "source_seed": 7,
+      "official_success": true,
+      "parameters": {
+        "approach": "direct",
+        "depth_offset_m": 0.0,
+        "pregrasp_distance": 0.12,
+        "lift_distance": 0.15,
+        "grasp_down_angle": 90.0,
+        "release_clearance": 0.22,
+        "withdraw_distance": 0.2
+      },
+      "source_events": [
+        "grasp_hypothesis",
+        "pregrasp",
+        "descend",
+        "close",
+        "lift",
+        "placement_geometry",
+        "leave"
+      ],
+      "scope": "Parameters observed in one successful scene; re-localize and replan in a new scene.",
+      "source_run": "donor-PickPlaceCounterToDrawer",
+      "lesson": "For PickPlaceCounterToDrawer, a direct vertical approach (90-degree descent) with a 0.12m pre-grasp distance and 0.15m lift is effective. The robot should approach the object on the counter, descend vertically to grasp, lift 0.15m, move to the drawer, and release with 0.22m clearance. The 0.2m withdraw distance ensures the arm clears the drawer after release. This sequence works when the object is accessible from above and the drawer is directly below or adjacent to the counter position.",
+      "applicability": "Applies to PickPlaceCounterToDrawer tasks where the object is on a counter and the target drawer is accessible. The direct vertical approach requires clear space above the object and sufficient drawer opening width. Re-localize object and drawer positions in new scenes; do not reuse absolute coordinates."
+    },
+    {
+      "id": "PickPlaceCounterToStandMixer-seed7",
+      "source_task": "PickPlaceCounterToStandMixer",
+      "source_seed": 7,
+      "official_success": true,
+      "parameters": {
+        "approach": "side_horizontal",
+        "depth_offset_m": 0.01,
+        "pregrasp_distance": 0.119999,
+        "lift_distance": 0.15,
+        "grasp_down_angle": 30.0,
+        "release_clearance": 0.3,
+        "withdraw_distance": 0.05,
+        "side_offset_m": 0.250088,
+        "side_clearance": 0.07,
+        "staging_rise": 0.494612,
+        "approach_height": 0.74,
+        "transfer_clearance": 0.3
+      },
+      "source_events": [
+        "grasp_hypothesis",
+        "pregrasp",
+        "descend",
+        "close",
+        "lift",
+        "placement_geometry",
+        "leave"
+      ],
+      "scope": "Parameters observed in one successful scene; re-localize and replan in a new scene.",
+      "source_run": "donor-PickPlaceCounterToStandMixer",
+      "lesson": "For PickPlaceCounterToStandMixer, a side-horizontal approach with a 30-degree grasp-down angle successfully transfers the object from the counter to the stand mixer. The robot approaches from the side (0.25m offset), descends at an angle to grasp, lifts 0.15m, and places with 0.3m clearance. The staging rise of 0.49m ensures the arm clears obstacles during transit. This approach works when the target is accessible from the side and requires angled grasping.",
+      "applicability": "Applies to PickPlace tasks where the source and target are on different surfaces (counter to stand) and the object requires angled grasping. The side approach avoids collisions with surrounding objects."
+    },
+    {
+      "id": "PickPlaceCounterToSink-seed7",
+      "source_task": "PickPlaceCounterToSink",
+      "source_seed": 7,
+      "destination_route": "sink_front_release",
+      "observed_pregrasp_distance_m": 0.06999958335688838,
+      "observed_release_height_m": 0.40552484052312743,
+      "official_success": true,
+      "parameters": {
+        "approach": "direct",
+        "depth_offset_m": 0.0,
+        "pregrasp_distance": 0.12,
+        "lift_distance": 0.07,
+        "grasp_down_angle": 90.0,
+        "release_clearance": 0.22,
+        "withdraw_distance": 0.1,
+        "sink_front_offset_m": 0.12,
+        "sink_withdraw_distance_m": 0.1
+      },
+      "source_events": [
+        "grasp_hypothesis",
+        "pregrasp",
+        "descend",
+        "close",
+        "lift",
+        "placement_geometry",
+        "leave"
+      ],
+      "scope": "Sink front release only; nominal grasp and route distances are executable inputs, observed distances are evidence. Reground the destination and source in each episode.",
+      "source_run": "PickPlaceCounterToSink-release-seed7-a",
+      "lesson": "Two frozen-scene trials intentionally opened above the robot-facing basin region, then withdrew outward, with official success and no recorded grip-loss event. The object settles under gravity.",
+      "applicability": "Counter-to-sink front release. Three successful episodes on the same frozen scene include one learned-card reuse. Seed8 failed source grounding before this skill could be selected.",
+      "parameter_corrections": {
+        "sink_front_offset_m": "0.12m from executed code/adaptive/skill_driver.py; previous geometric extraction0.120172m included the independent object-centering offset"
+      }
+    }
+  ],
+  "lessons": [
+    {
+      "source_run": "donor-PickPlaceCounterToDrawer",
+      "task": "PickPlaceCounterToDrawer",
+      "seed": 7,
+      "official_success": true,
+      "observed_stop": "success",
+      "reflection": {
+        "lesson": "For PickPlaceCounterToDrawer, a direct vertical approach (90-degree descent) with a 0.12m pre-grasp distance and 0.15m lift is effective. The robot should approach the object on the counter, descend vertically to grasp, lift 0.15m, move to the drawer, and release with 0.22m clearance. The 0.2m withdraw distance ensures the arm clears the drawer after release. This sequence works when the object is accessible from above and the drawer is directly below or adjacent to the counter position.",
+        "applicability": "Applies to PickPlaceCounterToDrawer tasks where the object is on a counter and the target drawer is accessible. The direct vertical approach requires clear space above the object and sufficient drawer opening width. Re-localize object and drawer positions in new scenes; do not reuse absolute coordinates.",
+        "evidence": [
+          "Official success with 745 actions",
+          "Successful relative motion card with direct approach parameters",
+          "Final scene shows robot arm retracted after placement"
+        ],
+        "next_attempt": "If this fails in a new scene, try increasing pre-grasp distance to 0.15m for better alignment, or use a slight angled approach (80-85 degrees) if vertical access is obstructed. Ensure release clearance is at least 0.2m to avoid drawer contact.",
+        "skill_steps": [
+          "Approach object on counter from above with 0.12m pre-grasp distance",
+          "Descend vertically (90 degrees) to grasp object",
+          "Lift object 0.15m clear of counter",
+          "Move to drawer location",
+          "Release object with 0.22m clearance above drawer",
+          "Withdraw arm 0.2m from drawer"
+        ]
+      }
+    },
+    {
+      "source_run": "donor-PickPlaceCounterToStandMixer",
+      "task": "PickPlaceCounterToStandMixer",
+      "seed": 7,
+      "official_success": true,
+      "observed_stop": "success",
+      "reflection": {
+        "lesson": "For PickPlaceCounterToStandMixer, a side-horizontal approach with a 30-degree grasp-down angle successfully transfers the object from the counter to the stand mixer. The robot approaches from the side (0.25m offset), descends at an angle to grasp, lifts 0.15m, and places with 0.3m clearance. The staging rise of 0.49m ensures the arm clears obstacles during transit. This approach works when the target is accessible from the side and requires angled grasping.",
+        "applicability": "Applies to PickPlace tasks where the source and target are on different surfaces (counter to stand) and the object requires angled grasping. The side approach avoids collisions with surrounding objects.",
+        "evidence": [
+          "Official success: true",
+          "Approach: side_horizontal with 30-degree grasp-down angle",
+          "Lift distance: 0.15m, release clearance: 0.3m"
+        ],
+        "next_attempt": "Re-localize the object and target in the new scene, then replan the side-horizontal approach with the same grasp-down angle and clearance parameters.",
+        "skill_steps": [
+          "Approach the object from the side with a 0.25m offset",
+          "Descend at a 30-degree angle to grasp the object",
+          "Lift the object 0.15m",
+          "Move to the stand mixer with 0.3m release clearance",
+          "Release the object and withdraw 0.05m"
+        ]
+      }
+    },
+    {
+      "source_run": "PickPlaceStoveToCounter-seed7-skill-transfer",
+      "task": "PickPlaceStoveToCounter",
+      "seed": 7,
+      "official_success": false,
+      "observed_stop": "policy_finished_false",
+      "reflection": {
+        "lesson": "The robot failed to execute the pick-and-place task because the ready posture did not track, preventing any physical interaction with the tomato. The visual grounding correctly identified the tomato but rejected the grasp due to the projected width exceeding the gripper's capacity. No successful strategy was tested as the robot stopped before attempting a grasp.",
+        "applicability": "This failure mode applies to any task where the robot's initial posture tracking is unstable or where the object's dimensions are incompatible with the gripper's projected width in the current view.",
+        "evidence": [
+          "stop_reason: 'ready posture did not track'",
+          "rejected_pairs: 'projected_width_exceeds_gripper'",
+          "final_stage: 'ready'"
+        ],
+        "next_attempt": "Adjust the camera calibration or gripper width parameters to ensure the projected width of the tomato fits within the gripper's capacity, and verify that the ready posture tracking is stable before initiating the pick action.",
+        "skill_steps": []
+      }
+    },
+    {
+      "source_run": "PickPlaceCounterToSink-baseline",
+      "task": "PickPlaceCounterToSink",
+      "seed": 7,
+      "official_success": false,
+      "observed_stop": "policy_finished_false",
+      "reflection": {
+        "lesson": "The direct center-height grasp descended too far into the tall carton; it stopped before closing. Post-run contact diagnosis found palm-object collision.",
+        "applicability": "Direct grasps of tall objects with RGB hull height available.",
+        "evidence": [
+          "No closed event.",
+          "The native descent was blocked before the commanded center height.",
+          "Post-run simulator contact evidence: palm against task object."
+        ],
+        "next_attempt": "Estimate an upper-body grasp from RGB silhouette height, leaving palm clearance.",
+        "skill_steps": []
+      },
+      "review_status": "reviewed_against_native_RGB_public_receipts_and_post_run_contact_diagnostics"
+    },
+    {
+      "source_run": "PickPlaceCounterToSink-height-replay",
+      "task": "PickPlaceCounterToSink",
+      "seed": 7,
+      "official_success": false,
+      "observed_stop": "policy_finished_false",
+      "reflection": {
+        "lesson": "Raising the grasp target also raised the pregrasp path; this new path hit the upper cabinet before reaching descent.",
+        "applicability": "Objects under an overhead cabinet; height changes must account for the whole arm route.",
+        "evidence": [
+          "No closed event.",
+          "Pregrasp tracking stalled.",
+          "Post-run simulator contact evidence: link6 against cabinet shelf."
+        ],
+        "next_attempt": "Retain the previously reached approach height while shortening final descent.",
+        "skill_steps": []
+      },
+      "review_status": "reviewed_against_native_RGB_public_receipts_and_post_run_contact_diagnostics"
+    },
+    {
+      "source_run": "PickPlaceCounterToSink-clearance",
+      "task": "PickPlaceCounterToSink",
+      "seed": 7,
+      "official_success": false,
+      "observed_stop": "policy_finished_false",
+      "reflection": {
+        "lesson": "The corrected upper-body grasp acquired the carton, but the fixed150 mm lift hit the overhead shelf after about131 mm. Acquisition does not establish full transport or task success.",
+        "applicability": "Direct carton grasp in this matched scene; broader transfer untested.",
+        "evidence": [
+          "Both fingers contacted the source carton after close.",
+          "RGB showed the carton lifted clear of the counter.",
+          "Lift tracking stopped near the overhead cabinet."
+        ],
+        "next_attempt": "Return first to the reached pregrasp height before moving laterally.",
+        "skill_steps": [
+          "Choose task source in RGB.",
+          "Grasp no lower than40 mm below the RGB hull top.",
+          "Preserve the original approach height."
+        ]
+      },
+      "review_status": "reviewed_against_native_RGB_public_receipts_and_post_run_contact_diagnostics"
+    },
+    {
+      "source_run": "PickPlaceCounterToSink-lowlift",
+      "task": "PickPlaceCounterToSink",
+      "seed": 7,
+      "official_success": false,
+      "observed_stop": "policy_finished_false",
+      "reflection": {
+        "lesson": "The carton was acquired and lifted69.4 mm. Four wrist mask selections could not see the sink, and the object slipped during later observation. No transfer or release was executed.",
+        "applicability": "Held-object destination observation; only this development scene has been tested.",
+        "evidence": [
+          "Post-lift RGB check and finger gap43.9 mm supported holding.",
+          "All four destination mask choices returned visible=false.",
+          "Finger gap collapsed to1.76 mm in inspect_place; the existing loss check excluded that stage."
+        ],
+        "next_attempt": "Ground and retain destination from external views before pickup; use target-directed views and detect loss during observation.",
+        "skill_steps": [
+          "Select the same task source across cameras.",
+          "Use the RGB upper-body grasp height.",
+          "Keep the reached approach corridor.",
+          "Lift back to that approach height."
+        ]
+      },
+      "review_status": "reviewed_against_native_RGB_public_receipts_and_post_run_contact_diagnostics"
+    },
+    {
+      "source_run": "PickPlaceCounterToSink-anchor",
+      "task": "PickPlaceCounterToSink",
+      "seed": 7,
+      "official_success": false,
+      "observed_stop": "policy_finished_false",
+      "reflection": {
+        "lesson": "Pre-pick Qwen basin/drain masks and public stereo calibration localized the sink. The correct carton was held after a69.4mm lift, but the full-frame current-view Qwen check falsely returned held=false and stopped execution.",
+        "applicability": "This frozen Sink scene and small source in wide external camera views.",
+        "evidence": [
+          "RGB and bilateral finger contact diagnostics support holding despite Qwen held=false.",
+          "Temporal crops of actual before-close/after-close/after-lift steps corrected the same-model judgment offline and in both later native trials."
+        ],
+        "next_attempt": "Use the same-camera, same-region three actual steps for holding verification; retain public-state-only crop selection.",
+        "skill_steps": [
+          "Identify the basin and fixed drain before moving.",
+          "Cache the RGB-derived drain world anchor.",
+          "Compare actual before-close, after-close and after-lift crops."
+        ]
+      },
+      "review_status": "reviewed against official result, actual RGB, public receipts and post-run contact diagnostics"
+    },
+    {
+      "source_run": "PickPlaceCounterToSink-temporal",
+      "task": "PickPlaceCounterToSink",
+      "seed": 7,
+      "official_success": false,
+      "observed_stop": "policy_finished_false",
+      "reflection": {
+        "lesson": "Temporal holding verification succeeded. Direct high transit reached the sink, but the palm contacted the spout and the carton slipped during lowering; official result=false. Stopping with the gripper still near the carton omitted a completion condition.",
+        "applicability": "This scene has a faucet above the destination; hand-only target reachability did not establish whole-arm clearance.",
+        "evidence": [
+          "Palm-spout contact recorded at observations14\u201316.",
+          "Finger gap collapsed from43.8mm after lift to2.15mm at observation18.",
+          "Official CounterToSink requires the object in the sink and gripper far away."
+        ],
+        "next_attempt": "Plan clearance for the full arm and carry geometry; when unloading occurs at the intended release point, open and withdraw before official evaluation.",
+        "skill_steps": []
+      },
+      "review_status": "reviewed against official result, actual RGB, public receipts and post-run contact diagnostics"
+    },
+    {
+      "source_run": "PickPlaceCounterToSink-front",
+      "task": "PickPlaceCounterToSink",
+      "seed": 7,
+      "official_success": true,
+      "observed_stop": "success",
+      "reflection": {
+        "lesson": "Official task success=true after the carton slipped into the sink. The robot-facing transit avoided the earlier high palm collision, but link7 contacted the spout during inward lowering. No intentional release or withdrawal executed, so this is a successful task outcome with an uncontrolled drop, not a controlled-placement donor.",
+        "applicability": "One fixed-scene trial only; route is a development hypothesis, not a validated reusable placement skill.",
+        "evidence": [
+          "Official simulator terminal status=success after470 actions.",
+          "Link7-spout contacts at observations16\u201317; empty finger gap2.09mm in lower_place.",
+          "Loss occurred about16cm from the release goal, so the new3cm near-release completion branch did not execute."
+        ],
+        "next_attempt": "Add full-arm collision-aware approach and controlled release, then repeat the policy on the same scene and test unseen scenes.",
+        "skill_steps": []
+      },
+      "skill_status": "not_promoted: official task success without demonstrated release and withdrawal",
+      "review_status": "reviewed against official result, actual RGB, public receipts and post-run contact diagnostics"
+    },
+    {
+      "source_run": "PickPlaceCounterToSink-release-seed7-a",
+      "task": "PickPlaceCounterToSink",
+      "seed": 7,
+      "official_success": true,
+      "observed_stop": "success",
+      "reflection": {
+        "lesson": "Two frozen-scene trials intentionally opened above the robot-facing basin region, then withdrew outward, with official success and no recorded grip-loss event. The object settles under gravity.",
+        "applicability": "Counter-to-sink with a visible drain and reachable front approach; unseen scenes are not yet validated.",
+        "evidence": [
+          "Both trials used443 actions and executed intentional_release, release and leave.",
+          "Qwen temporal holding check true in both; official success true."
+        ],
+        "next_attempt": "Retrieve this destination-specific card, then test its nominal and horizontal route parameters in a fresh episode.",
+        "skill_steps": [
+          "Reground the source and drain from RGB.",
+          "Use the nominal grasp approach and preserve actual visual clearance.",
+          "Check three actual grasp steps.",
+          "Transfer to the robot-facing basin region.",
+          "Open intentionally at the reached height.",
+          "Withdraw outward and evaluate after settling."
+        ]
+      },
+      "review_status": "reviewed against official outcomes and executed stages"
+    },
+    {
+      "source_run": "PickPlaceCounterToSink-release-seed7-b",
+      "task": "PickPlaceCounterToSink",
+      "seed": 7,
+      "official_success": true,
+      "observed_stop": "success",
+      "reflection": {
+        "lesson": "Official success after intentional release above the front basin region and outward withdrawal; no grasp_lost event. This repeats the same policy, frozen source scene and original donor bank as the first successful release trial.",
+        "applicability": "Same frozen seed7 scene; it supports repeatability or same-scene memory reuse.",
+        "evidence": [
+          "Intentional_release, release and leave executed.",
+          "Official success=true; no grasp_lost event."
+        ],
+        "next_attempt": "Improve source acquisition in new scenes before measuring cross-scene placement transfer.",
+        "skill_steps": []
+      },
+      "review_status": "reviewed against native task result, requests, events and sampled contact records"
+    },
+    {
+      "source_run": "PickPlaceCounterToSink-memory-seed7",
+      "task": "PickPlaceCounterToSink",
+      "seed": 7,
+      "official_success": true,
+      "observed_stop": "success",
+      "reflection": {
+        "lesson": "Official success after intentional release above the front basin region and outward withdrawal; no grasp_lost event. The Qwen retrieval selected the newly learned Sink card and consumed nominal12cm pregrasp and horizontal10cm withdrawal.",
+        "applicability": "Same frozen seed7 scene; it supports repeatability or same-scene memory reuse.",
+        "evidence": [
+          "Intentional_release, release and leave executed.",
+          "Official success=true; no grasp_lost event."
+        ],
+        "next_attempt": "Improve source acquisition in new scenes before measuring cross-scene placement transfer.",
+        "skill_steps": []
+      },
+      "review_status": "reviewed against native task result, requests, events and sampled contact records"
+    },
+    {
+      "source_run": "PickPlaceCounterToSink-memory-seed8",
+      "task": "PickPlaceCounterToSink",
+      "seed": 8,
+      "official_success": false,
+      "observed_stop": "policy_finished_false",
+      "reflection": {
+        "lesson": "The source bell pepper was never grounded. Initial Qwen localization described an object in the sink despite the task source being on the counter; all three mask checks returned no source. After an observation-pose change, all three mask checks again returned no source. Execution stopped before skill retrieval or grasp.",
+        "applicability": "Unresolved task-source search in a new kitchen layout; this did not evaluate learned placement motion.",
+        "evidence": [
+          "Two grounding attempts unresolved; all6 mask selections visible=false.",
+          "94 actions used for observation-posture change; no selected_skill or closure.",
+          "Official result=false."
+        ],
+        "next_attempt": "Use task source-region constraints and active camera/base search to acquire the object before precise segmentation; do not treat an object already in the destination as the source.",
+        "skill_steps": []
+      },
+      "review_status": "reviewed against native task result, requests, events and sampled contact records"
+    }
+  ]
+}

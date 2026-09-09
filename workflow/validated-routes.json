@@ -1,0 +1,95 @@
+{
+  "memory": "/home/jli/state/recovery-20260908/restored-memory.json",
+  "seed": 7,
+  "actions_per_episode": 900,
+  "routes": [
+    {
+      "task": "PickPlaceCounterToDrawer",
+      "code": "/home/jli/work/qwen-workflow-skills/b9fe2dd861a670aa",
+      "entry": "legacy",
+      "args": [
+        "--candidate",
+        "bowl",
+        "--perception",
+        "sam2",
+        "--approach",
+        "direct",
+        "--release-clearance",
+        ".22",
+        "--place"
+      ],
+      "development_success": "baseline-PickPlaceCounterToDrawer",
+      "reproduced_success": "reproduce-PickPlaceCounterToDrawer"
+    },
+    {
+      "task": "PickPlaceCounterToStandMixer",
+      "code": "/home/jli/work/qwen-workflow-v5-recovery/30a8783d522e02aa",
+      "entry": "legacy",
+      "args": [
+        "--candidate",
+        "object",
+        "--depth-offset",
+        "0.01",
+        "--perception",
+        "sam2",
+        "--approach",
+        "side_horizontal",
+        "--release-clearance",
+        "0.3",
+        "--side-clearance",
+        "0.07",
+        "--operation",
+        "pick_place",
+        "--side-offset",
+        "0.25",
+        "--base-backoff",
+        "0.0",
+        "--grasp-down-angle",
+        "30.0",
+        "--transfer-clearance",
+        "0.3",
+        "--approach-height",
+        "0.74",
+        "--place"
+      ],
+      "development_success": "baseline-PickPlaceCounterToStandMixer",
+      "reproduced_success": "reproduce-PickPlaceCounterToStandMixer"
+    },
+    {
+      "task": "PickPlaceCounterToSink",
+      "code": "/home/jli/work/recovery-validated-20260908/sink",
+      "entry": "modern",
+      "args": [],
+      "reproduced_success": "reproduce-PickPlaceCounterToSink",
+      "memory": "/home/jli/state/recovery-20260908/restored-memory.json"
+    },
+    {
+      "task": "PickPlaceStoveToCounter",
+      "code": "/home/jli/work/recovery-validated-20260908/stove",
+      "entry": "modern",
+      "args": [
+        "--base-backoff",
+        ".15"
+      ],
+      "reproduced_success": "reproduce-PickPlaceStoveToCounter",
+      "memory": "/home/jli/state/recovery-20260908/restored-memory.json"
+    },
+    {
+      "task": "PickPlaceSinkToCounter",
+      "code": "/home/jli/work/recovery-validated-20260908/garlic-reviewed",
+      "entry": "modern",
+      "args": [
+        "--base-backoff",
+        ".15",
+        "--grasp-height-offset",
+        ".02"
+      ],
+      "development_success": "garlic-receiver-anchor",
+      "memory": "/home/jli/state/recovery-20260908/restored-memory.json",
+      "reproduced_success": "garlic-reviewed",
+      "previous_reproductions": [
+        "reproduce-PickPlaceSinkToCounter"
+      ]
+    }
+  ]
+}

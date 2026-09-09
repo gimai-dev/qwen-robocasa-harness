@@ -1,0 +1,87 @@
+{
+  "facts": {
+    "task": "PickPlaceCounterToMicrowave",
+    "seed": 7,
+    "official_success": false,
+    "status": "policy_finished_false",
+    "actions": 423,
+    "final_stage": "ground",
+    "stop_reason": "RGB grounding unresolved after base and wrist views",
+    "execution_events": [
+      {
+        "kind": "finish",
+        "reason": "RGB grounding unresolved after base and wrist views"
+      }
+    ],
+    "workflow_adaptations": [],
+    "pose_attempts": [
+      {
+        "stage": "source_inspect",
+        "status": "kinematically_unresolved",
+        "reason": null
+      }
+    ],
+    "source_grounding": {
+      "status": "unresolved",
+      "target": "hotdog bun",
+      "rejected_pairs": [
+        {
+          "views": [
+            "left",
+            "right"
+          ],
+          "reason": "projected_width_exceeds_gripper",
+          "widths_m": {
+            "left": 0.11570364236831665,
+            "right": 0.09491068124771118
+          }
+        }
+      ]
+    }
+  },
+  "reflection": {
+    "lesson": "The robot failed to execute the PickPlaceCounterToMicrowave task because it could not resolve the RGB grounding for the 'hotdog bun'. The source grounding was rejected because the projected width of the object in both the left and right camera views exceeded the gripper's capacity, leading to a kinematically unresolved state. The robot spent 423 actions attempting to inspect the source but never reached the grasp or place stages.",
+    "applicability": "low",
+    "evidence": [
+      "The stop reason is explicitly 'RGB grounding unresolved after base and wrist views'.",
+      "The source grounding status is 'unresolved' with a rejected pair due to 'projected_width_exceeds_gripper'.",
+      "The final stage is 'ground', indicating the robot never successfully identified a graspable pose for the target object."
+    ],
+    "next_attempt": "Adjust the camera calibration or the gripper's width parameters to ensure the projected width of the hotdog bun is within the acceptable range for grounding. Alternatively, use a different object or a larger gripper for this task.",
+    "skill_steps": []
+  },
+  "model_evidence": {
+    "latency_s": 3.9642192739993334,
+    "system_prompt_sha256": "9f76633c7c2b0b3c9d2f6dd29307ca9072b4fdc6113258bbfcff2e140e33839f",
+    "instruction_sha256": "c4554584b1cf6bbd138b04f736dd55dd7a4b40179e6b60ad6f5d9b90cbcb2429",
+    "image_sha256": {
+      "left": "2acc34de447ca3009c1a7e68e116fad26073d356a9d248c58bfc4312c57c98fa",
+      "right": "0c60e4995d12151021355950784bcc440c669b1056213b56ebcec586f82e310d",
+      "wrist": "bd7d402bc9375dbe86d2dd93e054a731772c1b72b9d3a64cc8b31a5190b00f57"
+    },
+    "image_roles": {
+      "left": "official_left",
+      "right": "official_right",
+      "wrist": "official_wrist"
+    },
+    "usage": {
+      "prompt_tokens": 505,
+      "total_tokens": 762,
+      "completion_tokens": 257,
+      "prompt_tokens_details": null
+    },
+    "finish_reason": "stop",
+    "raw_sha256": "c3ada07027404ed599bb916fbd92841c9a7d36576ca1f7801d2c5d230d4939ec",
+    "raw_chars": 1109,
+    "snapshot_digest": "27829db7e5189de5f7a0d5ac967b33a4b8ff5e5c28b28a4dd7790599e448ce91",
+    "served_model_id": "qwen3.8-27b-bf16-1e3f3ae1b737d6ead4959128d99a75ec",
+    "decoding": {
+      "seed": 3074294,
+      "temperature": 0,
+      "top_p": 1,
+      "max_tokens": 700,
+      "enable_thinking": false
+    },
+    "response_schema_sha256": "e68819f78e261fa34262565af7aeeb24494eb083589e3ed73a00cd7dea60fd69"
+  }
+}

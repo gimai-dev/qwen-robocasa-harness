@@ -1,0 +1,120 @@
+{
+  "planned_tasks": 10,
+  "completed_tasks": 10,
+  "official_successes": 5,
+  "complete": true,
+  "elapsed_s": 1202.4993345737457,
+  "rows": [
+    {
+      "task": "PickPlaceCounterToDrawer",
+      "route": "/home/jli/work/recovery-cohort-20260908/PickPlaceCounterToDrawer",
+      "official_success": true,
+      "native_result_present": true,
+      "exit_code": 0,
+      "actions": 745,
+      "stage": "leave",
+      "reason": "pick and place sequence finished; evaluate official outcome",
+      "qwen_calls": 4
+    },
+    {
+      "task": "PickPlaceCounterToStandMixer",
+      "route": "/home/jli/work/recovery-cohort-20260908/PickPlaceCounterToStandMixer",
+      "official_success": true,
+      "native_result_present": true,
+      "exit_code": 0,
+      "actions": 873,
+      "stage": "leave",
+      "reason": "pick and place sequence finished; evaluate official outcome",
+      "qwen_calls": 10
+    },
+    {
+      "task": "PickPlaceCounterToSink",
+      "route": "/home/jli/work/recovery-cohort-20260908/PickPlaceCounterToSink",
+      "official_success": true,
+      "native_result_present": true,
+      "exit_code": 0,
+      "actions": 398,
+      "stage": "leave",
+      "reason": "pick and place sequence finished; evaluate official outcome",
+      "qwen_calls": 12
+    },
+    {
+      "task": "PickPlaceStoveToCounter",
+      "route": "/home/jli/work/recovery-cohort-20260908/PickPlaceStoveToCounter",
+      "official_success": true,
+      "native_result_present": true,
+      "exit_code": 0,
+      "actions": 775,
+      "stage": "leave",
+      "reason": "pick and place sequence finished; evaluate official outcome",
+      "qwen_calls": 12
+    },
+    {
+      "task": "PickPlaceSinkToCounter",
+      "route": "/home/jli/work/recovery-cohort-20260908/PickPlaceSinkToCounter",
+      "official_success": true,
+      "native_result_present": true,
+      "exit_code": 0,
+      "actions": 642,
+      "stage": "leave",
+      "reason": "pick and place sequence finished; evaluate official outcome",
+      "qwen_calls": 12
+    },
+    {
+      "task": "PickPlaceDrawerToCounter",
+      "route": "/home/jli/work/recovery-cohort-20260908/PickPlaceDrawerToCounter",
+      "official_success": false,
+      "native_result_present": true,
+      "exit_code": 0,
+      "actions": 458,
+      "stage": "verify",
+      "reason": "task source not held after lift",
+      "qwen_calls": 5
+    },
+    {
+      "task": "PickPlaceCabinetToCounter",
+      "route": "/home/jli/work/recovery-cohort-20260908/PickPlaceCabinetToCounter",
+      "official_success": false,
+      "native_result_present": true,
+      "exit_code": 0,
+      "actions": 336,
+      "stage": "retreat",
+      "reason": "contact blocked; reversing executed waypoints",
+      "qwen_calls": 9
+    },
+    {
+      "task": "PickPlaceCounterToCabinet",
+      "route": "/home/jli/work/recovery-cohort-20260908/PickPlaceCounterToCabinet",
+      "official_success": false,
+      "native_result_present": true,
+      "exit_code": 0,
+      "actions": 698,
+      "stage": "locate_place",
+      "reason": "receiver unresolved after lateral views",
+      "qwen_calls": 30
+    },
+    {
+      "task": "PickPlaceCounterToMicrowave",
+      "route": "/home/jli/work/recovery-cohort-20260908/PickPlaceCounterToMicrowave",
+      "official_success": false,
+      "native_result_present": true,
+      "exit_code": 0,
+      "actions": 423,
+      "stage": "ground",
+      "reason": "RGB grounding unresolved after base and wrist views",
+      "qwen_calls": 18
+    },
+    {
+      "task": "PickPlaceMicrowaveToCounter",
+      "route": "/home/jli/work/recovery-cohort-20260908/PickPlaceMicrowaveToCounter",
+      "official_success": false,
+      "native_result_present": true,
+      "exit_code": 0,
+      "actions": 848,
+      "stage": "close",
+      "reason": "unreachable_front_withdraw",
+      "qwen_calls": 20
+    }
+  ],
+  "success_rate": 0.5
+}

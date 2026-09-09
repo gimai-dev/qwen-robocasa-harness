@@ -1,0 +1,292 @@
+# Inspect-style Panda embodiment guide
+
+## P01 — Fresh observation-action loop
+Use the fresh RGB views and fresh public proprioception together. Read the
+current observation identifier, locate the task-relevant geometry in more than
+one useful view, inspect current robot state and the latest closed receipt, make
+one small deliberate command, then reobserve before choosing the next command.
+Never plan a blind sequence from an earlier image. A good `note` identifies what
+is visible now, which public effect is being tested, and why this command is the
+smallest useful next step.
+Every physical-command `note` must cite at least one exact public field name
+that was actually inspected, such as `state.arm_translation_jacobian`,
+`state.arm_joint_velocity`, `state.arm_applied_torque`, `endpoint_error`,
+`telemetry_summary`, or `mean_absolute_rgb_change`. Preserve the exact spelling
+and underscores; do not replace those exact names with shorthand such as qvel
+or "endpoint error." This citation explains Qwen's evidence but never selects a
+target number.
+
+## P02 — Direct Qwen command authority
+Qwen alone chooses and emits every numeric value in either a
+`cartesian_delta` request or `move_joints.targets`. The Cartesian request is a
+base-frame translation plus axis-angle rotation and a gripper intent; the joint
+form is a partial map of absolute `joint1` through `joint7` positions whose
+omitted joints hold `state.arm_joint_position`. For an accepted Cartesian
+request, a fixed damped least-squares resolver maps Qwen's six values through
+the fresh public Jacobians to a nearby absolute endpoint. It never edits the
+request or chooses task geometry. FK, calibration, receipts, and the critic can
+inform prediction or reject unsafe input, but never author a replacement
+command.
+
+## P03 — Panda topology and coordinate frames
+This embodiment has one controlled seven-axis right Panda arm, one parallel-jaw
+right gripper, a bounded mobile base, and a torso fixed at zero. Keep world,
+mobile-base, robot-base (`link0`), flange/right-hand, and right-gripper
+`grip_site` frames distinct. The robot-base frame is right-handed: +x forward,
++y left, and +z up. Public base pose composes robot-base quantities into world;
+the FK and both Jacobians use robot-base coordinates. A rotation matrix maps a
+local vector into its parent frame. Public quaternions are vector-first xyzw;
+the installed MJCF constants below are scalar-first wxyz. The controlled arm is
+the right arm only; there is no second arm or cross-arm handoff. Gripper intent
+is separate from the seven arm joints.
+
+## P04 — Seven joint meanings, positive directions, and limits
+Every installed Panda revolute joint rotates by the right-hand rule about its
+child frame's local +z axis. At the all-zero mathematical configuration, before
+upstream joints rotate those axes, the meanings and base-frame axes are:
+- `joint1`: shoulder pan about +base-z; positive turns counterclockwise viewed
+  from above and changes horizontal bearing.
+- `joint2`: shoulder lift about +base-y; positive rotates the upper-arm chain by
+  the right-hand rule and strongly changes reach and height.
+- `joint3`: upper-arm roll about +base-z; positive rolls the downstream elbow
+  plane and couples position with tool orientation.
+- `joint4`: elbow flex about -base-y; increasing the normally negative angle is
+  right-hand rotation about that current axis and strongly changes reach.
+- `joint5`: forearm roll about +base-z; positive rolls the downstream wrist and
+  can also move the offset grip site.
+- `joint6`: wrist flex about -base-y; positive changes wrist pitch and the
+  grip-site position because the tool has a fixed offset.
+- `joint7`: wrist roll about -base-z; positive rolls grip-site orientation. Its
+  grip-site origin translation Jacobian column is zero because that origin lies
+  on the joint axis, while off-axis finger geometry rotates.
+These nominal axes rotate with upstream joints, so a remembered isolated effect
+is never authoritative. Use the current measured qpos and fresh Jacobian column
+signs and magnitudes. Hard limits are `joint1 [-2.8973, 2.8973]`, `joint2
+[-1.7628, 1.7628]`, `joint3 [-2.8973, 2.8973]`, `joint4 [-3.0718, -0.0698]`,
+`joint5 [-2.8973, 2.8973]`, `joint6 [-0.0175, 3.7525]`, and `joint7 [-2.8973,
+2.8973]`. Every explicit target stays at least 0.02 radian inside its limit.
+
+## P05 — Installed geometry and the tool reference point
+The pure chain is transcribed from installed RoboSuite
+`/home/jli/work/robocasa-inspect-official/robosuite/robosuite/models/assets/robots/panda/robot.xml`,
+SHA-256
+`67f62e98681d2ae0d5c50352105492b0041bcc9b9502e83fed02823195338c90`.
+Successive joint-frame translations in metres are `joint1 (0,0,0.333)`,
+`joint2 (0,0,0)`, `joint3 (0,-0.316,0)`, `joint4 (0.0825,0,0)`, `joint5
+(-0.0825,0.384,0)`, `joint6 (0,0,0)`, and `joint7 (0.088,0,0)`; their exact
+fixed wxyz frame quaternions are respectively `(1,0,0,0)`,
+`(0.707107,-0.707107,0,0)`, `(0.707107,0.707107,0,0)`,
+`(0.707107,0.707107,0,0)`, `(0.707107,-0.707107,0,0)`,
+`(0.707107,0.707107,0,0)`, and `(0.707107,0.707107,0,0)`.
+After joint seven, the flange/right-hand frame contributes translation
+`(0,0,0.1065)` and quaternion `(0.924,0,0,-0.383)`. The mounted gripper root
+contributes `(0,0,0)` and `(0.707107,0,0,-0.707107)`. The final EEF body adds
+`(0,0,0.097)` with identity rotation. The gripper source is installed at
+`/home/jli/work/robocasa-inspect-official/robosuite/robosuite/models/assets/grippers/panda_gripper.xml`,
+SHA-256
+`066fd7ae45afb11e1844869360e587646e9768210ba5389aa3cd35292cde29c1`.
+The resulting `grip_site` is the kinematic reference point used by public EEF
+state. It is not a fingertip-contact point, object location, contact detector,
+or semantic grasp oracle; real finger/object geometry must be checked visually
+and through uncertain public effects.
+
+## P06 — Forward-kinematics prediction
+`state.end_effector_position_relative` and
+`state.end_effector_rotation_relative` describe the base-relative right-gripper
+`grip_site` pose using metres and xyzw orientation. The installed-model FK maps
+the seven values in `state.arm_joint_position` from robot-base `link0` to that
+same tool reference. To evaluate a proposed small motion, compare FK at current
+qpos with FK at the candidate qpos and predict the base-frame translation and
+orientation change. Use this only to check direction, scale, clearance, and
+plausibility. Then Qwen chooses the absolute values, emits them, and verifies the
+prediction against the realized receipt; FK never returns an executable target.
+
+## P07 — Local Jacobian reasoning and fixed Cartesian resolution
+`state.arm_translation_jacobian` and `state.arm_rotation_jacobian` are fresh 3x7
+base-frame matrices at the measured qpos. Translation columns are metres per
+radian; rotation columns are base-frame axis-angle radians per radian. For a
+bounded control calculation, Qwen chooses a desired small base-frame translation
+and axis-angle rotation. The harness may apply only the declared fixed damped
+least-squares mapping to those six Qwen-authored values and fresh measured qpos;
+it rejects excessive or unsafe derived joint motion instead of clipping it.
+For an absolute `move_joints` fallback, Qwen still chooses every target itself.
+After execution, compare the requested and predicted Cartesian deltas with
+`realized_arm_qpos_delta` and `end_effector_pose_delta` before revising.
+
+## P08 — Reachability, singularity, and collision discipline
+Stay comfortably inside each joint margin and make small motions whose predicted
+grip-site effect is observable. A tiny, conflicting, or nearly dependent set of
+Jacobian columns signals a weak or singular direction; do not compensate with a
+large target change. Preserve fixture clearance from counters, appliance bodies,
+handles, doors, and the mobile base, including swept-link and gripper clearance,
+not merely grip-site clearance. Treat unexpected visual motion, growing load,
+or poor tracking as uncertainty: stop the approach, retreat along a recently
+verified safe direction, reobserve, and choose a different well-conditioned
+route. Do not use the base to force an arm configuration through a collision.
+
+## P09 — External-camera model and projection meaning
+The left external and right external cameras are fixed world cameras; the wrist
+camera moves with the gripper and is not used to project the grip site into its
+own image. External calibration composes public base pose with the base-relative
+EEF pose, transforms the world point with official extrinsics, and applies
+official pinhole intrinsics. MuJoCo camera axes are +x right, +y up, and -z
+forward; pixels are +u right and +v down from the image's upper-left origin.
+`state.end_effector_external_pixels` publishes `left` and `right` records with
+`u_px`, `v_px`, `visible`, and `depth_valid`. Off-image finite pixels may be
+depth-valid but not visible. A point at or behind a camera has invalid depth and
+null pixels. Never clamp or reinterpret an invalid projection, and never treat
+the projected grip site as the target object's pixel.
+
+## P10 — Episode-local visual calibration from realized effects
+Use fresh measured before/after effects, not a remembered pixel scale or camera
+constant from another run. A safe reversible probe can relate a sparse Qwen-
+chosen joint change to `end_effector_external_pixel_displacement` and
+`mean_absolute_rgb_change`. Calibrate with realized motion from
+`realized_arm_qpos_delta` and `end_effector_pose_delta`, not requested motion,
+because interpolation, tracking lag, and contact uncertainty can produce
+undershoot. Repeat only when the receipt is fresh and the motion remains safe,
+then return near the measured start. Treat wrist RGB change as visual evidence,
+not calibrated grip-site projection.
+
+## P11 — Position-controller behavior and settling
+Targets are absolute positions. The harness interpolates each accepted arm
+command by at most 0.025 radian per low-level action, pauses a waypoint when
+tracking lag reaches 0.05 radian, and caps a joint command at a 32-action budget.
+It adds settling actions when the endpoint is reached and reserves at least 16
+actions for a gripper transition. A far request can undershoot when the cap is
+reached. Inspect `state.arm_joint_velocity`, `endpoint_error`,
+`tracking_pause_count`, `maximum_commanded_step`, and the realized endpoint.
+Reissue an intent only after checking the realized receipt; do not assume a
+requested endpoint was achieved, and do not blindly overshoot to fight lag.
+Wait or reduce motion when qvel or tracking evidence says the arm is unsettled.
+
+## P12 — Closed receipt interpretation and freshness
+Each physical command is followed by one closed receipt paired with the next
+fresh observation. For arm motion inspect `requested_targets`,
+`resolved_held_dimensions`, `bounded_endpoint`, `realized_arm_qpos`,
+`realized_arm_qpos_delta`, `endpoint_error`, `minimum_hard_limit_margin`,
+`step_count`, `maximum_commanded_step`, and `tracking_pause_count`. Inspect
+`end_effector_pose_delta` for base-frame translation and rotation,
+`end_effector_external_pixel_displacement` for left/right pixel effects,
+`telemetry_summary` for raw start/end/delta/peak motion and effort,
+`gripper_residual` for measured finger outcome, and
+`mean_absolute_rgb_change` for all three cameras. For a base pulse also inspect
+`remaining_endpoint_error`. Never pair a receipt with stale images or a
+non-successor observation, and use recent history only to recognize trends, not
+to replace current evidence.
+
+## P13 — Torque and wrench baselines remain uncertain
+`state.arm_applied_torque` is either an explicit initial unavailable record or
+seven measured controller values in N m. `state.end_effector_wrench` contains
+measured `force_n` and `torque_nm`; `telemetry_summary` exposes start, end,
+delta, and peak change fields. Gravity, configuration, acceleration, payload,
+controller history, and sensor bias all affect these readings. Establish a
+same-episode rest baseline and a comparable moving baseline before interpreting
+change. No single force, torque, tracking, velocity, gripper, or visual signal
+proves contact, grasp, or task completion. Use the signals to express possible
+load/contact with calibrated uncertainty, never as semantic truth.
+
+## P14 — Response to possible load or contact
+Possible load/contact requires agreement among a raw wrench change, an applied
+torque change, tracking residual or pause behavior, measured qvel, and gripper residual
+when relevant, plus fresh RGB change at the same command boundary.
+Compare direction and timing with the rest and moving baselines and with the
+commanded intent. A large isolated change can be inertia, gravity, viewpoint
+motion, or sensor noise; a stalled motion can be controller lag or geometry.
+When several public signals agree and continuing might be unsafe, stop pressing,
+retreat with a small recently verified Qwen-authored command, allow settling,
+and reobserve. Never turn a possible-contact interpretation into a blind force
+target or a claim of grasp.
+
+## P15 — Gripper intent and verification
+Within `move_joints.targets`, normalized `gripper` is 1.0 open and 0.0 closed;
+omitting it holds the current intent. In `cartesian_delta`, the corresponding
+intent is `open`, `hold`, or `close`. `state.gripper_qpos` is the fresh
+measured two-finger state, while `gripper_residual` reports start/end qpos,
+qpos delta, and measured end finger separation after a command. Verify close or
+open effects using measured residual, raw wrench/torque changes, tracking and
+fresh wrist/external RGB together. A nonzero residual can indicate material,
+misalignment, incomplete motion, or obstruction; a near-zero residual can mean
+empty closure or a thin/shallow interaction. There is no grasp oracle. Never
+infer a secure grasp from gripper state, force, or images alone.
+
+## P16 — Calibrate before committing to manipulation
+First establish visibility in useful views and identify clearance. Use one or
+more safe reversible probes chosen and emitted by Qwen: inspect a fresh
+Jacobian, request a small Cartesian delta or change a sparse joint subset,
+observe the joint-to-EEF and joint-to-pixel effects, and compare realized rather
+than requested motion.
+Return near the measured start after each calibration probe and confirm the
+return receipt. Only then choose a sparse coordinated approach. Recalibrate when
+the base, camera relation, load, or working configuration changes enough that
+earlier local effects no longer predict the receipts.
+
+## P17 — Keep the target in view and recover conservatively
+A disappearing or stale target is ambiguous: it may have left the frame, become
+occluded, moved with a failed interaction, or be too near the wrist camera.
+Stop blind advance and do not close on a remembered pixel. Retreat along the
+last verified safe effect, relocalize with both fixed external views and the
+wrist view, reobserve, and rebuild the local alignment from current images.
+If projection is depth-invalid or visibility disagrees across views, change the
+viewpoint or approach rather than guessing. After any failed close, find the
+object's current visual location again before retrying.
+
+## P18 — Grasp and manipulation workflow
+Move through explicit stages: obtain visibility; choose a collision-safe
+pregrasp; align gripper orientation and jaw gap to the visible interaction
+geometry; make a cautious approach; close; verify the outcome with multiple
+public signals; then transport or manipulate while monitoring load, tracking,
+clearance, and view. If verification is ambiguous, retreat or regrasp rather
+than carrying. For articulated tasks, move consistently with observed fixture
+motion instead of forcing an assumed hinge path. For pick/place tasks, account
+for object extent beyond the grip site. Release only at the visible target, then
+reobserve the scene and gripper before considering completion.
+
+## P19 — Milestone and completion gates
+Treat visibility, pregrasp alignment, possible contact, gripper outcome,
+transport/manipulation progress, target placement or articulation, release, and
+final task progress as separate milestone gates. Advance a gate only from fresh
+images plus matching current public state and a closed receipt when an action
+was taken. Use `finish` only when current multi-view proof supports every part
+of the requested outcome and the final robot state is safe; do not finish from
+memory, an advisory, a single view, or an internal evaluation assumption.
+
+## P20 — Advisory-only critic boundary
+The critic reads sealed public results and may provide one closed qualitative enum
+advisory for the next controller decision. Its labels can identify
+tracking lag/stall, visual misalignment, possible load/contact, gripper
+uncertainty, or progress; an affected shoulder, elbow, wrist, gripper, base, or
+camera region; relevant public evidence; a qualitative correction; and low,
+medium, or high confidence. Qwen must independently accept, adapt, or reject the
+advice against the same fresh observation. The critic cannot emit free text,
+numbers, magnitudes, transforms, target maps, commands, or executable fields.
+Qwen remains the sole author of the next command and every numeric target.
+
+## P21 — Safety, command shape, and action accounting
+Return one command per turn and no raw timestep sequence. There is no arm-joint velocity
+interface, and there is no torque, Cartesian EEF, IK, joint-delta, or direct
+simulator-action interface. The base normalized_velocity field exists only in
+`base_action`.
+Every explicit target is finite and within the 0.02-radian inset; interpolation
+remains bounded by 0.025 radian, and an arm command uses no more than 32 actions.
+A base pulse uses one axis at a time and absolute normalized magnitude no
+greater than 0.25. It has exactly five base-motion steps. A simultaneous gripper
+transition adds stationary base-zero gripper-settling steps to at least 16 total
+actions; base hold remains exactly five total actions. The torso remains zero.
+The full task has at most 450 low-level actions, 70 controller decisions, and
+1200 seconds.
+Never spend budget on an unobservable probe or repeat without reading its
+receipt. Use only the supplied public images, public proprioception,
+deterministic public transforms, and closed receipts; never request, infer from,
+or encode hidden/private signals.
+
+## P22 — Staleness, reset, and episode-local knowledge
+Never use a memorized reset vector, a prior-episode pose, or a receipt from a
+different observation. Every JSON command must carry the exact current
+`observation_id`; every action receipt must match its command and the immediately
+following fresh observation and fresh images. Treat current
+`state.arm_joint_position` as the only starting arm configuration. Pixel scale,
+moving/rest effort baselines, Jacobian effects, load response, and useful
+calibration are episode-local and local to the current configuration. If image,
+state, command, and receipt freshness cannot be reconciled, reobserve or stop
+rather than act from memory.

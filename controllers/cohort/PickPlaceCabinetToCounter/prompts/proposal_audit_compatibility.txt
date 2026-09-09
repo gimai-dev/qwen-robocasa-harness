@@ -1,0 +1,21 @@
+## Exp-005 proposal-audit compatibility
+For exp-005, this final clause supersedes P20's post-action timing and legacy
+advisory field vocabulary. The critic now performs a same-decision pre-execution proposal audit
+of each Qwen-authored draft before any mailbox command exists. It still consumes
+the immediately prior sealed action receipt (or null on the first decision)
+together with the exact current public state, three RGB views, and closed
+milestone history. Its output remains closed, qualitative, non-executable, and
+free of numbers, targets, or commands.
+
+The RoboCasa platform is PandaOmron: one controlled seven-axis Franka Emika Panda arm
+and parallel-jaw gripper mounted on an Omron mobile base. This name does not
+expand the command surface. Qwen directly authors the Panda arm targets, and the
+only exposed base control is the existing bounded `base_action`; the prompt does not expose any other base motor interface.
+Qwen remains the sole author of every direct command and every numeric value,
+and Qwen alone authors any same-observation revision.
+
+For an `observe` or `wait_for_settle` hold, use the command's partial-target
+semantics: omit every arm joint you intend to hold, because an omitted joint
+holds its fresh measured value. Never restate all seven current joint positions
+merely to hold them. Include only a needed gripper intent or arm joints that you
+actually choose to change; Qwen still authors every value that is present.

@@ -1,0 +1,72 @@
+{
+  "version": "h114-grounding-lesson-on-h80-bank",
+  "skills": [
+    {
+      "id": "source-contact-verification",
+      "trigger": "source_contact",
+      "evidence_status": "cross_task_grounding_failures_verified; recovery_guidance_requires_actual_evaluation",
+      "lesson": "Small pixel error or ray gap did not establish object identity or finger enclosure. An occluded external view can coexist with a useful wrist+external pair. A published EEF pixel names the robot, not the source.",
+      "procedure": "Verify the focused source landmarks in fresh RGB and use the accepted camera_pair. Never substitute a published EEF pixel for a missing source correspondence. When fresh public geometry is supplied, compare the robot-base landmark and EEF positions along each axis, inspect clearance, and choose an existing bounded open Cartesian approach or observation-gathering move. State the expected motion direction and check the next receipt and images. If observed separation does not decrease, revise the correspondence or approach hypothesis. Image alignment alone does not justify closing; the actual fingers must surround the source. Qwen chooses all motor values from current evidence.",
+      "evidence": [
+        "H68 Mixer and H69/H71 Drawer: precise alignment still ended in empty closes.",
+        "H109 Drawer: perception plus450actions yielded no close; H111 removed one unstable point.",
+        "H110/H112: appearance text recovered a missed Mixer cake; actual recovery remained unsuccessful.",
+        "H113 Drawer: corrected primary object point but substituted the left EEF pixel as secondary."
+      ]
+    },
+    {
+      "id": "empty-close-information-gain",
+      "trigger": "empty_source_close",
+      "evidence_status": "failure_and_interface_semantics_verified; revised_recovery_guidance_to_evaluate",
+      "lesson": "An empty close disproves acquisition by that executed approach. In H72, repeated stereo commands were described as further insertion but realized only 0.42mm then0.03mm motion; another close remained empty. A changed explanation does not change the target geometry.",
+      "procedure": "Use the failed approach as a local counterexample. With other_view_pixel present, image_servo depth_delta_m offsets the TRIANGULATED point depth, not the current gripper depth. The same pixel pair and offset therefore request the same fixed target; repeated commands can finish a bounded move, but cannot add depth after convergence. In single-view mode, depth_delta_m instead offsets CURRENT depth. Read the realized pose delta before claiming new insertion. After an empty close, test a specific correspondence, depth or finger-position hypothesis using current views and a genuinely changed target or observation-gathering motion. Keep the chosen hypothesis consistent: reducing a stereo offset reverses the extra depth just requested. State the expected observable effect in the command note and check it against the next receipt. Qwen must choose all fresh action values.",
+      "evidence": [
+        "H68 Mixer and Drawer each ended with two empty closes.",
+        "H71 Mixer recovered from a format failure but still failed to establish contact.",
+        "H72 Mixer calls23/24/25: identical stereo pair and+0.01m offset, diminishing measured movement; call31 emptyclose. Calls33/34/35 switched+0.02/+0.01/+0.02m and physically reversed direction. Exact values belong to this archived case, not a transferable motor program."
+      ]
+    },
+    {
+      "id": "malformed-proposal-recovery",
+      "trigger": "malformed_proposal",
+      "evidence_status": "runtime_recovery_verified",
+      "lesson": "A length-stopped malformed reply is not an executed action. H71 recovered from the identical malformed reply after its retry preview was bounded.",
+      "procedure": "Return one complete command object matching the current schema. Use the current observation and original action budget. The rejected raw text is not a movement receipt; infer no physical progress from it.",
+      "evidence": [
+        "H69/H71 Mixer: identical first12 inputs/drafts; bounded retry eliminated context overflow."
+      ]
+    }
+  ],
+  "evidence_report": "/Users/jiachen/Documents/Codex/2026-09-04/ce-handoff-resume-tmp-compound-engineering/outputs/qwen-failure-skills/pending-grounding-lesson.json",
+  "learning_type": "external retrieval memory; frozen Qwen weights",
+  "prior_cases": [
+    {
+      "task": "PickPlaceCounterToStandMixer",
+      "kind": "empty_source_close",
+      "failure_count": 4,
+      "outcome": "empty_source_close",
+      "evidence_status": "observed_failure; recovery_not_implied"
+    },
+    {
+      "task": "PickPlaceCounterToDrawer",
+      "kind": "empty_source_close",
+      "failure_count": 6,
+      "outcome": "empty_source_close",
+      "evidence_status": "observed_failure; recovery_not_implied"
+    },
+    {
+      "task": "PickPlaceCounterToDrawer",
+      "kind": "malformed_proposal",
+      "failure_count": 2,
+      "outcome": "proposal_not_executed",
+      "evidence_status": "observed_failure; recovery_not_implied"
+    },
+    {
+      "task": "PickPlaceCounterToStandMixer",
+      "kind": "malformed_proposal",
+      "failure_count": 2,
+      "outcome": "proposal_not_executed",
+      "evidence_status": "observed_failure; recovery_not_implied"
+    }
+  ]
+}

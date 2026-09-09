@@ -1,0 +1,20 @@
+{
+  "schema": "robocasa-qwen10-baseline/v1",
+  "seed": 7,
+  "source_path": "/home/jli/artifacts/robocasa-inspect-official/fable-inspect-100-v2/result.json",
+  "source_sha256": "cb24f566f123d01652f54574fc2757d929e4da99972cb8015aa27517a4019e99",
+  "source_system_prompt_sha256": "b125fecdf5a1745451163573e31154fc13aed9bb3306b95845fb20052106771a",
+  "tasks": [
+    {"task":"OpenToasterOvenDoor","split":"adaptation","family":"articulated","policy":"direct_fallback","status":"policy_gave_up","success":false,"wall_s":24.596529421018204},
+    {"task":"PickPlaceCounterToDrawer","split":"adaptation","family":"articulated","policy":"direct_fallback","status":"policy_finished_false","success":false,"wall_s":25.87187722598901},
+    {"task":"AdjustWaterTemperature","split":"adaptation","family":"control","policy":"direct_fallback","status":"policy_failed_repair_zero_motion_while_task_active","success":false,"wall_s":16.178188535996014},
+    {"task":"StoreLeftoversByType","split":"adaptation","family":"grasp_place","policy":"direct_fallback","status":"policy_finished_false","success":false,"wall_s":18.92091871998855},
+    {"task":"PickPlaceCounterToStandMixer","split":"adaptation","family":"grasp_place","policy":"direct_fallback","status":"policy_gave_up","success":false,"wall_s":26.138771940983133},
+    {"task":"RestockPantry","split":"adaptation","family":"grasp_place","policy":"direct_fallback","status":"policy_failed_invalid_repair","success":false,"wall_s":20.565218214003835},
+    {"task":"ToastOnCorrectRack","split":"transfer","family":"articulated","policy":"direct_fallback","status":"policy_finished_false","success":false,"wall_s":42.12796652602265},
+    {"task":"PickPlaceCounterToCabinet","split":"transfer","family":"articulated","policy":"direct_fallback","status":"policy_finished_false","success":false,"wall_s":21.03318309900351},
+    {"task":"StartCoffeeMachine","split":"transfer","family":"control","policy":"direct_fallback","status":"policy_finished_false","success":false,"wall_s":20.08562714100117},
+    {"task":"PickPlaceToasterToCounter","split":"transfer","family":"grasp_place","policy":"direct_fallback","status":"policy_gave_up","success":false,"wall_s":19.193484987976262}
+  ]
+}
+
