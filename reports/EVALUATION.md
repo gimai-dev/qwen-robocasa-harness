@@ -10,7 +10,7 @@ All ten native result files contain Boolean official outcomes. All ten launches 
 
 ## Per-task outcomes and recordings
 
-The common `PickPlace` prefix is omitted from the display names. Follow **Evidence** for the corresponding native result and **Video** for the original MP4. The [public gallery](https://gimai-dev.github.io/qwen-robocasa-harness/) provides browser playback and individual task anchors.
+The common `PickPlace` prefix is omitted from the display names. Follow **Evidence** for the corresponding native result and **Video** for the original MP4. The [public video index](https://github.com/gimai-dev/qwen-robocasa-harness/blob/main/videos/README.md) provides individual task anchors and direct MP4 playback links.
 
 | Task | Outcome | Actions | Qwen calls | Final stage | Recording and evidence |
 |---|---|---:|---:|---|---|

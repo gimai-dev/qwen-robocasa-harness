@@ -75,3 +75,7 @@ The release validation checks the ten saved native outcomes against the summary,
 ## English publication normalization
 
 All repository documentation, source comments, filenames, and textual records are English. Four occurrences of a truncated directional phrase in the earlier Microwave-to-Counter baseline wrapper were translated to English; that file includes a publication note. Its recorded actions and outcomes are unchanged. The latest full ten-task cohort result files and controller snapshots are preserved without this translation.
+
+## Video sharing
+
+The public sharing entry point is [videos/README.md](../videos/README.md), with a poster, official outcome, and direct MP4 link for every task. `docs/index.html` is an optional HTML gallery source. GitHub Pages is not enabled: the publishing account has repository write permission, and the Pages creation request returned HTTP 404. An organization administrator can enable Pages from `main:/docs` later. The public repository and MP4 links are already available without Pages.
