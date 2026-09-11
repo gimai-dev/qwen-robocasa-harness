@@ -292,3 +292,21 @@ Per-episode means are in each block's results table; a short-mode episode costs 
 - Milestones are computed from simulator state the policy never sees; they are diagnostic, not part of any objective.
 - The no-progress rule (8 consecutive decisions without motion) ended 6 Phase B episodes early; from Phase C on, after the reach and contact notes, it rarely triggered.
 - The Qwen server dropped two requests during Phase E (infrastructure errors, rerun on the same scenes).
+
+
+## 12. Show-Harness-style interface with zero-shot Qwen-27B (2026-09-12)
+
+Plan: `docs/superpowers/plans/2026-09-11-show-harness-style-qwen27b.md`. Two lanes: their code with our model, and their interface inside our loop. Both use the frozen `qwen3.8-27b-bf16`, temperature 0, thinking off, no demonstrations.
+
+### Lane A: Show-Harness on its own ManiSkill benchmark, our model
+
+Setup (RUNBOOK "Lane A"): Show-Harness at 137d571, ManiSkill 3.0.1, stock `PickCube-v1` with `panda_wristcam` at 256 px (their default BlockPAP-v1 real2sim rig needs an RLinf module the public repo does not ship). Their runner unchanged except that the controller uses their zero-shot `complete_token` call (vLLM `guided_choice` over the nine tokens) instead of the bare-token call meant for fine-tuned adapters. 60 decisions per episode, 30 episodes over consecutive seeds, `auto_release` plugin on (their default). Raw logs: `results-direct/laneA/`, rollouts under `/home/jli/state/show-harness/rollouts/MS-PickCube-v1/`.
+
+| Prompt | Success | Token histogram over 1,742 decisions |
+|---|---|---|
+| their `v3` lite prompt (task + recent moves) | 1/30 | GRASP 1699, MV_DOWN 39, MV_LEFT 2, MV_RIGHT 2 |
+| `v3q`: same plus one `Gripper: {gripper_state}` line and "RELEASE after an empty close" (the proprioception plugin's content) | 1/30 | GRASP 1493, MV_DOWN 203, MV_UP 28, MV_RIGHT 10, MV_LEFT 8, RELEASE 0 |
+
+The one success in each batch is the same seed (8): the cube happened to sit under the open gripper, and MV_DOWN then GRASP finished the task in 2 steps. In every other episode the model answers GRASP on almost every step, the empty gripper is reopened by auto-release, and it grasps again; it never emits RELEASE, MV_FWD or MV_BACK. The scene is trivially legible (a red cube centred on a wooden table, visible in both views). On the same interface the paper reports 86-96% for Gemini 3.1 Pro / GPT-5.6 / Opus 5 and 86% for a 2B Qwen fine-tuned on a few GPU-hours of demonstrations. The zero-shot 27B model does not use the interface at all: it does not steer with the wrist view before grasping.
+
+Caveats: their ManiSkill runner carries only the `auto_release` plugin (subtask planning, recovery, multi-view guidance live in the real-robot/RoboLab runners); PickCube is not their headline BlockPAP rig; 30 episodes per condition.
