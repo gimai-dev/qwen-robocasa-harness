@@ -66,6 +66,7 @@ def select_states(rows: list[dict], max_states: int) -> list[dict]:
     for run, seq in by_run.items():
         seq.sort(key=lambda r: r["sequence"])
         held_before = False
+        touched_before = False
         for row in seq:
             if row.get("obj_world_m") is None:
                 continue
@@ -79,9 +80,10 @@ def select_states(rows: list[dict], max_states: int) -> list[dict]:
                 failure = "empty_close_near_object"
             elif held_before and not holding and row["gripper_obj_distance_m"] > 0.05:
                 failure = "object_lost_after_grasp"
-            elif row.get("preceding_status") == "unreachable" and False:
-                failure = None
+            elif touched_before and not row.get("gripper_touching_obj") and not holding and row["gripper_obj_distance_m"] > 0.08:
+                failure = "contact_lost_without_grasp"
             held_before = holding
+            touched_before = bool(row.get("gripper_touching_obj")) and not holding
             if failure and horizontal < 0.75 and row["sequence"] * 20 <= 500 and not row.get("official_success"):
                 selected.append({**row, "failure_type": failure})
                 break  # one state per source episode; split by source episode
