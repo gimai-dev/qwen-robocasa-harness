@@ -227,7 +227,18 @@ Both successes are on the same start (CounterToSink seed 100: a glass cup; clean
 | h2 | ee | short | 60 | 866 | 65.1 | 21.4 | 65.1 | 256333 | 9803 | 233 | 242 | 540 |
 
 
-(test-set milestones pending)
+#### Test-set local-progress milestones (evaluator-side, n=60 paired starts; `results-direct/phaseE-test-milestones.md`)
+
+| Milestone | clean | H2 | paired diff | bootstrap 95% interval | wins / losses |
+|---|---|---|---|---|---|
+| approach within 0.10 m | 7/60 | 15/60 | +0.133 | [+0.017, +0.250] | 11 / 3 |
+| gripper touched object | 5/60 | 12/60 | +0.117 | [+0.033, +0.217] | 8 / 1 |
+| held grasp | 3/60 | 5/60 | +0.033 | [-0.033, +0.100] | 3 / 1 |
+| lifted >= 0.03 m | 2/60 | 4/60 | +0.033 | [0.000, +0.083] | 2 / 0 |
+| object displaced >= 0.10 m | 2/60 | 6/60 | +0.067 | [0.000, +0.150] | 5 / 1 |
+| official success | 1/60 | 1/60 | 0.000 | [0, 0] | 0 / 0 |
+
+Median closest approach: clean 0.66 m, H2 0.32 m. On the frozen test set the relative action representation reliably improves the pre-grasp stages (approach and contact intervals exclude zero) but not the grasp-and-beyond stages, and not complete-task success. This is the one harness effect in the campaign that is supported by data; it is an effect on local progress, not on the task objective.
 
 ## 7. Phase F: transfer
 
@@ -256,7 +267,7 @@ Per-episode means are in each block's results table; a short-mode episode costs 
 
 ## 9. Recommendations for further work
 
-- The binding failure is target selection from 256x256 images plus region positions: the model rarely reaches the object (clean approach within 10 cm in 0/9 development and 2/15 validation starts). The two cheapest measured levers were the relative action representation (H2: approach 5/15) and kinematic previews (H3: rejections 0.5 per episode instead of 27). Neither converts into grasps at a useful rate. A next step with a plausible mechanism is a grasp-stage representation change rather than more history: e.g. wrist-camera-anchored displacement commands, or an explicit "descend until contact" primitive that Qwen parameterizes numerically.
+- The binding failure is target selection from 256x256 images plus region positions: the model rarely reaches the object (clean approach within 10 cm in 0/9 development and 2/15 validation starts). The one supported effect is the relative action representation (H2): on the 60-start test set it raises approach from 7 to 15 and contact from 5 to 12 (paired intervals exclude zero) without moving holds, lifts or success beyond noise. Kinematic previews (H3) remove rejections (0.5 per episode instead of 27) at double the call cost, with no downstream gain. Neither converts into grasps at a useful rate. A next step with a plausible mechanism is a grasp-stage representation change rather than more history: e.g. wrist-camera-anchored displacement commands, or an explicit "descend until contact" primitive that Qwen parameterizes numerically.
 - The recovery evaluation shows the failure states are recoverable to a grasp (3/5 re-grasps for both clean and H8) but not to task completion within 400 steps; the bottleneck after re-grasp is transport and release, not recovery detection.
 - H6/H7 need real successes to build banks from; the one clean development success (Phase B) did not repeat under the Phase C interface, and no validated skill exists. Any bank-based condition should wait for a controller with a non-zero grasp rate.
 - Do not compare Phase B clean numbers with Phase C-E numbers: the interface changed between them (documented in section 3).
