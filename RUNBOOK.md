@@ -5,14 +5,14 @@
 | What | Where |
 |---|---|
 | Working repository (Mac) | `/Users/jiachen/Desktop/first try/qwen-direct-control`, branch `direct-control` (cloned from the published harness at `/Users/jiachen/Documents/Codex/2026-09-06/ban/publish/qwen-robocasa-harness`, history preserved) |
-| Runtime checkout (h200-4) | `/home/jli/work/qwen-direct-control` (rsync mirror of the Mac repo; `.git`, `videos/`, `results/` excluded) |
+| Runtime checkout (h200-4) | `/home/jli/work/qwen-direct-control` (frozen copy used by a running matrix) and `/home/jli/work/qwen-direct-control-dev` (development copy); each episode subprocess imports code from its own checkout, so never rsync into a checkout while its matrix runs |
 | New code | `direct/` package (kinematics, actions, sim_child, executor, perception, sam_server, observation, policy, methods, harnesses, episode, matrix) |
 | Shared runtime modules | `runtime/robocasa_inspect/` (identical to `/home/jli/work/robocasa-inspect-official/robocasa_inspect`, verified by diff 2026-09-10) |
 | Episode outputs | `/home/jli/state/qwen-direct/runs/<name>` (single episodes), `/home/jli/state/qwen-direct/matrix/<name>` (matrices) |
 | Pinned initial scenes | `/home/jli/state/qwen-direct/scenes/<Task>-seed<N>.json` (model XML + flattened state + ep_meta; created on first use, restored exactly afterwards) |
 | Simulator | `/home/jli/work/robocasa-inspect-official` (RoboCasa 1.0.1, robosuite 1.5.2, MuJoCo 3.3.1), Python `/home/jli/work/robocasa-inspect-official/.venv/bin/python` |
 | SAM | `/home/jli/state/qwen-rgb-sam2/.venv/bin/python`, checkpoint `sam2.1_hiera_small.pt`, run as a persistent CUDA server per episode (`direct/sam_server.py`) |
-| Qwen | vLLM `qwen3.8-27b-bf16` on `http://127.0.0.1:8002/v1` (h200-4), identity/attestation/token files under `/home/jli/state/panda-qwen38/` (env `QWEN_IDENTITY_MANIFEST`, `QWEN_SERVER_ATTESTATION`, `QWEN_API_TOKEN_FILE`; defaults built in) |
+| Qwen | vLLM `qwen3.8-27b-bf16` on `http://127.0.0.1:8002/v1` (h200-4), identity/attestation/token files under `/home/jli/state/panda-qwen38/`. Restarted 2026-09-10 with `/home/jli/serving/venv-llm/bin/python /home/jli/state/panda-qwen38/start_direct_qwen.py` (copy of the released start script with `--limit-mm-per-prompt {"image":8} --max-num-seqs 4`); rerun that script after a box restart, it regenerates the attestation and token |
 
 Sync Mac -> box:
 
@@ -57,6 +57,26 @@ $PY -m direct.matrix --tasks PickPlaceCounterToSink PickPlaceCounterToDrawer Pic
 
 `summary.json` / `summary.md` are rewritten after every finished episode; a run directory with an existing `result.json` is reused, so a matrix can be resumed.
 
+Analysis (tables, paired differences vs clean with bootstrap intervals, costs):
+
+```bash
+$PY -m direct.analyze --matrices /home/jli/state/qwen-direct/matrix/<a> /home/jli/state/qwen-direct/matrix/<b> --out /home/jli/state/qwen-direct/matrix/<name>-results.md
+```
+
+H6/H7 banks from clean development runs, then use them with `--method h6 --method-config '{"bank": ".../h6-failures.json"}'` (H7: `h7-skills.json`):
+
+```bash
+$PY -m direct.banks --runs /home/jli/state/qwen-direct/matrix/<clean matrix> --out /home/jli/state/qwen-direct/banks/<name>
+```
+
+H8 recovery evaluation (inspect clean-run snapshots evaluator-side, select recoverable failure states, continue clean vs h8 from the same state with the 400-step / 600 s / 80-decision recovery budget):
+
+```bash
+$PY -m direct.recovery inspect --runs /home/jli/state/qwen-direct/matrix/<clean matrix> --out /home/jli/state/qwen-direct/banks/recovery
+$PY -m direct.recovery select --bank /home/jli/state/qwen-direct/banks/recovery --max-states 10
+$PY -m direct.recovery continue --bank /home/jli/state/qwen-direct/banks/recovery --methods clean h8 --out /home/jli/state/qwen-direct/recovery/<name> --parallel 2
+```
+
 ## Protocol constants (executor level)
 
 | Constant | Value | Where |
@@ -71,12 +91,14 @@ $PY -m direct.matrix --tasks PickPlaceCounterToSink PickPlaceCounterToDrawer Pic
 | Base | axis x/y/yaw, |v| <= 0.5, velocity for 10 steps then brake for 10; 0.5 -> 0.047 m or 0.216 rad per slot; arm joints held, chassis hold during arm motion | `actions`, `sim_child.execute_base`, `chassis_hold` |
 | Orientation frame | FK `grip_site` frame (+z approach out of the gripper, fingers close along local x); the public eef quaternion is this frame rotated 90 deg about z and is only logged | `sim_child._public_state` |
 | Budgets | 900 steps, 1200 s, 180 decisions (episode); rejected actions cost a decision, not steps | `episode` |
+| Contact force | scalar: wrist force magnitude minus the free-hanging baseline magnitude (the sensor bias rotates with the wrist, so vector deltas are meaningless); Phase B ran with the earlier vector form | `sim_child.publish` |
+| Snapshots | full simulator state saved at every observation under `sim/snapshots/` (evaluator-side; used by `direct.recovery`) | `sim_child.publish` |
 | Qwen decoding | seed 3074294, temperature 0, top_p 1, thinking off, strict JSON schema; 1024 max tokens short, 4096 full | `policy` |
 | No-progress stop | 8 consecutive decisions without motion end the episode (`no_progress`) | `episode.MAX_CONSECUTIVE_NO_MOTION` |
 
 ## Per-run artefacts
 
-`config.json`, `system-prompt.txt`, `qwen-calls.jsonl` (full user text, raw output, usage, finish reason, latency), `decisions.jsonl` (action, receipt, status), `perception/<decision>/regions.json` + masks, `sim/frames/<seq>/{left,right,wrist}.png`, `sim/mailbox/*.json` (every command and observation with per-step tracking trace), `sim/scene.json`, `sim/terminal-outcome.json` (official predicate), `episode.mp4` (10 fps mosaic, one frame per 4 steps), `result.json`.
+`config.json`, `system-prompt.txt`, `qwen-calls.jsonl` (full user text, raw output, usage, finish reason, latency), `decisions.jsonl` (action, receipt, status), `perception/<decision>/regions.json` + masks, `sim/frames/<seq>/{left,right,wrist}.png`, `sim/mailbox/*.json` (every command and observation with per-step tracking trace), `sim/scene.json`, `sim/snapshots/*.json`, `sim/terminal-outcome.json` (official predicate), `episode.mp4` (10 fps mosaic, one frame per 4 steps), `result.json`.
 
 ## Phase A record (2026-09-10)
 
