@@ -142,6 +142,17 @@ Joint-short milestones (evaluator-side, `results-direct/phaseC/phaseC-joint-shor
 
 The 4,096-token bound is not what limits full mode: the longest clean plan (10 actions) used 724 tokens. Qwen writes short one-shot plans and stops.
 
+### H8 separate recovery evaluation (done 2026-09-11)
+
+State bank: `results-direct/recovery/states.json` (5 states, selected evaluator-side from Phase C snapshots; one per source episode, split by source episode). The clean runs produced no candidate because clean never came within 10 cm of an object, so states were taken from the H1, H2, H3 and H4 runs that did: 2 empty closes near the object (H1 CounterToDrawer seed 2 at 260 steps, H4 CounterToSink seed 0 at 320 steps) and 3 contacts lost without a grasp (H1, H2, H3 on CounterToSink seed 2 at 460, 220 and 160 steps). Each continuation restores the exact simulator state, carries the preceding action/receipt and pre-action images, and runs with the recovery budget (400 steps, 600 s, 80 decisions).
+
+| Continuation | Recovered / states | RSR | Notes |
+|---|---|---|---|
+| clean | 0/5 | 0.00 | 4 ran the full 400 steps, 1 stopped after 40 steps |
+| H8 explicit recovery | 0/5 | 0.00 | 4 ran the full 400 steps (9-12 of 20 expectation checks were mismatches), 1 stopped at decision 1 with no motion |
+
+Recoverability of these five states is **unconfirmed**: the plan requires at least one independent continuation to complete the task within the budget, and none did. The table is therefore a paired comparison on states of unknown recoverability, not a recovery success rate; no L1-L4 breakdown is reported. Raw data: `/home/jli/state/qwen-direct/recovery/phaseC-states/`.
+
 ## 5. Costs
 
 (pending)

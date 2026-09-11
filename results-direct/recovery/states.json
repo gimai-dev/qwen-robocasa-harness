@@ -1,0 +1,234 @@
+[
+ {
+  "run": "/home/jli/state/qwen-direct/matrix/phaseC-ee-short/PickPlaceCounterToDrawer-s2-ee-short-h1",
+  "task": "PickPlaceCounterToDrawer",
+  "seed": 2,
+  "method": "h1",
+  "sequence": 13,
+  "snapshot": "/home/jli/state/qwen-direct/matrix/phaseC-ee-short/PickPlaceCounterToDrawer-s2-ee-short-h1/sim/snapshots/000013.json",
+  "steps_used": null,
+  "preceding_decision": 14,
+  "preceding_action": {
+   "k": "ee",
+   "p": [
+    3.958,
+    -0.484,
+    1.08
+   ],
+   "o": [
+    -1.0,
+    0.002,
+    0.0,
+    0.003
+   ],
+   "n": "Lift pizza cutter off counter"
+  },
+  "preceding_status": "completed",
+  "gripper_width_m": 0.0010750476794783026,
+  "gripper_command": 0.0,
+  "tcp_world_m": [
+   3.958042972608435,
+   -0.48384540840652085,
+   1.0786360800266266
+  ],
+  "base_world_m": [
+   4.0573906898498535,
+   -0.8405441045761108,
+   0.7000143527984619
+  ],
+  "obj_world_m": [
+   3.7947080719206285,
+   -0.465986457601769,
+   0.9531397434534835
+  ],
+  "gripper_obj_distance_m": 0.20675227959416426,
+  "gripper_touching_obj": false,
+  "official_success": false,
+  "error": null,
+  "failure_type": "empty_close_near_object"
+ },
+ {
+  "run": "/home/jli/state/qwen-direct/matrix/phaseC-ee-short/PickPlaceCounterToSink-s0-ee-short-h4",
+  "task": "PickPlaceCounterToSink",
+  "seed": 0,
+  "method": "h4",
+  "sequence": 16,
+  "snapshot": "/home/jli/state/qwen-direct/matrix/phaseC-ee-short/PickPlaceCounterToSink-s0-ee-short-h4/sim/snapshots/000016.json",
+  "steps_used": null,
+  "preceding_decision": 16,
+  "preceding_action": {
+   "k": "hold",
+   "g": 0,
+   "n": "close gripper on orange"
+  },
+  "preceding_status": "completed",
+  "gripper_width_m": 0.0022056573070585728,
+  "gripper_command": 0.0,
+  "tcp_world_m": [
+   5.242538600434422,
+   -1.461322145119055,
+   0.9911954700946808
+  ],
+  "base_world_m": [
+   4.950728893280029,
+   -2.0642495155334473,
+   0.7000486850738525
+  ],
+  "obj_world_m": [
+   5.26418995315011,
+   -1.4465246689312368,
+   0.952999042611
+  ],
+  "gripper_obj_distance_m": 0.04633267645007785,
+  "gripper_touching_obj": true,
+  "official_success": false,
+  "error": null,
+  "failure_type": "empty_close_near_object"
+ },
+ {
+  "run": "/home/jli/state/qwen-direct/matrix/phaseC-ee-short/PickPlaceCounterToSink-s2-ee-short-h1",
+  "task": "PickPlaceCounterToSink",
+  "seed": 2,
+  "method": "h1",
+  "sequence": 23,
+  "snapshot": "/home/jli/state/qwen-direct/matrix/phaseC-ee-short/PickPlaceCounterToSink-s2-ee-short-h1/sim/snapshots/000023.json",
+  "steps_used": null,
+  "preceding_decision": 37,
+  "preceding_action": {
+   "k": "ee",
+   "p": [
+    0.371,
+    -1.961,
+    1.1
+   ],
+   "o": [
+    0.7071,
+    0.7071,
+    0.0,
+    0.0
+   ],
+   "n": "Move held bottle toward sink position at counter height"
+  },
+  "preceding_status": "partial",
+  "gripper_width_m": 0.08000991865992546,
+  "gripper_command": 1.0,
+  "tcp_world_m": [
+   0.4696539765360267,
+   -1.5010490461299937,
+   1.1206116676330566
+  ],
+  "base_world_m": [
+   0.7465152740478516,
+   -1.8572391271591187,
+   0.7001923322677612
+  ],
+  "obj_world_m": [
+   0.4890473471320368,
+   -1.4530950144427308,
+   1.0255214621953357
+  ],
+  "gripper_obj_distance_m": 0.10824894103563369,
+  "gripper_touching_obj": false,
+  "official_success": false,
+  "error": null,
+  "failure_type": "contact_lost_without_grasp"
+ },
+ {
+  "run": "/home/jli/state/qwen-direct/matrix/phaseC-ee-short/PickPlaceCounterToSink-s2-ee-short-h2",
+  "task": "PickPlaceCounterToSink",
+  "seed": 2,
+  "method": "h2",
+  "sequence": 11,
+  "snapshot": "/home/jli/state/qwen-direct/matrix/phaseC-ee-short/PickPlaceCounterToSink-s2-ee-short-h2/sim/snapshots/000011.json",
+  "steps_used": null,
+  "preceding_decision": 18,
+  "preceding_action": {
+   "k": "ee",
+   "p": [
+    0.25,
+    -1.7617,
+    1.2379
+   ],
+   "o": [
+    0.8248,
+    -0.5269,
+    -0.195,
+    0.064
+   ],
+   "g": 1,
+   "n": "Move toward sink basin to release juice"
+  },
+  "preceding_status": "partial",
+  "gripper_width_m": 0.07975215092301369,
+  "gripper_command": 1.0,
+  "tcp_world_m": [
+   0.4486518973418706,
+   -1.4963228551349326,
+   1.1720149219036102
+  ],
+  "base_world_m": [
+   0.7460073232650757,
+   -1.8513224124908447,
+   0.6999997496604919
+  ],
+  "obj_world_m": [
+   0.5490490596500045,
+   -1.3673463816437597,
+   1.0381029320389037
+  ],
+  "gripper_obj_distance_m": 0.21129824369073744,
+  "gripper_touching_obj": false,
+  "official_success": false,
+  "error": null,
+  "failure_type": "contact_lost_without_grasp"
+ },
+ {
+  "run": "/home/jli/state/qwen-direct/matrix/phaseC-ee-short/PickPlaceCounterToSink-s2-ee-short-h3",
+  "task": "PickPlaceCounterToSink",
+  "seed": 2,
+  "method": "h3",
+  "sequence": 8,
+  "snapshot": "/home/jli/state/qwen-direct/matrix/phaseC-ee-short/PickPlaceCounterToSink-s2-ee-short-h3/sim/snapshots/000008.json",
+  "steps_used": null,
+  "preceding_decision": 8,
+  "preceding_action": {
+   "k": "ee",
+   "p": [
+    0.55,
+    -1.95,
+    1.1
+   ],
+   "o": [
+    1.0,
+    0.0,
+    0.0,
+    0.0
+   ],
+   "g": 1,
+   "n": "A: move toward sink basin"
+  },
+  "preceding_status": "partial",
+  "gripper_width_m": 0.07999581098556519,
+  "gripper_command": 1.0,
+  "tcp_world_m": [
+   0.5442500061283071,
+   -1.5271374843761405,
+   1.118339091539383
+  ],
+  "base_world_m": [
+   0.9072861075401306,
+   -1.8512036800384521,
+   0.7001000046730042
+  ],
+  "obj_world_m": [
+   0.5456211382378502,
+   -1.5155147330412586,
+   0.9798394451086071
+  ],
+  "gripper_obj_distance_m": 0.13899321771627468,
+  "gripper_touching_obj": false,
+  "official_success": false,
+  "error": null,
+  "failure_type": "contact_lost_without_grasp"
+ }
+]
