@@ -202,7 +202,7 @@ Chosen from the Phase C milestones (success gave no signal): H1+H2 (both improve
 | H1+H2 | 0/15 | H1 0/15, H2 0/15, clean 0/15 | 72 decisions, 27 rejected, 300k prompt tokens |
 | H3+H4 | 0/15 | H3 0/15, H4 0/15, clean 0/15 | 44 decisions, 0.3 rejected, 88 calls, 21k completion tokens |
 
-Neither combination changes complete-task success; the paired differences against clean and against each component are zero. (Combination milestones: pending.)
+Neither combination changes complete-task success; the paired differences against clean and against each component are zero. Combination milestones on the same 15 starts (`results-direct/phaseD-combos-milestones.md`): H1+H2 approached in 4, held in 3, lifted in 3, displaced in 1; H3+H4 approached in 2, held in 2, lifted in 2, displaced in 2; clean on these starts approached in 2, held in 2, lifted in 2, displaced in 1; H2 alone approached in 5 and held in 3. Neither combination is separable from its components or from clean at these counts.
 
 ### Phase E decision
 
