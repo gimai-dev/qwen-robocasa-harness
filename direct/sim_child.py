@@ -330,7 +330,7 @@ class Child:
             public_raw = raw
             executed += 1
             commanded = waypoint
-            force = float(np.linalg.norm(np.asarray(_wrench(environment)["force_n"]) - np.asarray(self.force_baseline or [0.0, 0.0, 0.0])))
+            force = float(np.linalg.norm(_wrench(environment)["force_n"]) - np.linalg.norm(self.force_baseline or [0.0, 0.0, 0.0]))
             peak_force = max(peak_force, force)
             q_now = _arm_qpos(environment)
             trace.append({"commanded_q": [round(v, 4) for v in waypoint], "actual_q": [round(v, 4) for v in q_now],
@@ -407,7 +407,10 @@ class Child:
         state = _public_state(raw, environment)
         if self.force_baseline is None:
             self.force_baseline = list(state["wrench"]["force_n"])
-        state["contact_force_delta_n"] = [a - b for a, b in zip(state["wrench"]["force_n"], self.force_baseline, strict=True)]
+        # The wrist sensor carries a large bias that rotates with the wrist; the norm
+        # change relative to the free-hanging baseline is the usable contact signal.
+        import math
+        state["contact_force_delta_n"] = round(math.sqrt(sum(v * v for v in state["wrench"]["force_n"])) - math.sqrt(sum(v * v for v in self.force_baseline)), 2)
         state["force_baseline_n"] = self.force_baseline
         calibration = state.pop("camera_calibration")
         images = _save_images(raw, self.run / "frames" / f"{sequence:06d}")

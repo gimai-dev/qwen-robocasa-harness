@@ -18,14 +18,14 @@ def _r(value: object, digits: int = 3) -> object:
 
 def state_summary(observation: Mapping[str, object]) -> dict:
     s = observation["public_state"]
-    force = s.get("contact_force_delta_n", s["wrench"]["force_n"])
+    force = s.get("contact_force_delta_n")
     return _r({
         "tcp_world_m": s["tcp_world_position_m"],
         "tcp_quat_xyzw": s["tcp_world_quat_xyzw"],
         "arm_q_rad": s["arm_q_rad"],
         "gripper_command": int(round(float(observation["gripper_command"]))),
         "gripper_width_m": s["gripper_width_m"],
-        "contact_force_n": [force[0], force[1], force[2]],
+        "contact_force_n": force,
         "base_world_m": s["base_world_position_m"],
         "base_yaw_rad": s["base_world_yaw_rad"],
         "tcp_pixels": {k: [v["u"], v["v"]] if v["visible"] else None for k, v in s["tcp_pixels"].items()},
