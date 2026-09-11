@@ -153,11 +153,40 @@ State bank: `results-direct/recovery/states.json` (5 states, selected evaluator-
 
 Recoverability of these five states is **unconfirmed**: the plan requires at least one independent continuation to complete the task within the budget, and none did. The table is therefore a paired comparison on states of unknown recoverability, not a recovery success rate; no L1-L4 breakdown is reported. Evaluator-side milestones of the continuations (`results-direct/recovery/phaseC-states-milestones.md`) show the states are physically recoverable at least to a grasp: from the same 5 states, clean re-approached in 4, re-grasped (held) in 3, lifted in 2 and displaced the object by more than 10 cm in 3; H8 re-approached in 4, held in 3, lifted in 2 and displaced in 0. Neither completed the task within the 400-step recovery budget. Raw data: `/home/jli/state/qwen-direct/recovery/phaseC-states/`.
 
-## 5. Costs
+## 5. Phase D: validation and combinations
+
+### Singles on the 15 validation starts (done 2026-09-11)
+
+Matrix `/home/jli/state/qwen-direct/matrix/phaseD-singles` (3 tasks x seeds 10-14, EE-short, same code as Phase C); tables in `results-direct/phaseD-singles-results.md`. Candidates were the four conditions with local progress in Phase C.
+
+| Condition | Success / attempts | Paired diff vs clean (n=15) |
+|---|---|---|
+| clean | 0/15 | - |
+| H1 visual markers | 0/15 | 0, interval [0, 0] |
+| H2 relative actions | 0/15 | 0 |
+| H3 propose and preview | 0/15 | 0 |
+| H4 execution timing | 0/15 | 0 |
+
+No condition reaches any complete-task success on unseen development seeds. H3 removes almost all rejected actions (0.5 per episode vs 27.5 for clean, because it previews reachability before committing) at the price of two calls per decision (91 calls, 19k completion tokens, 409 s of Qwen time per episode). H1 makes more decisions and more rejections than clean (81 and 38 vs 69 and 28).
+
+#### Costs (means per episode)
+
+| method | interface | mode | n | sim steps | decisions | rejected | Qwen calls | prompt tok | completion tok | Qwen s | SAM s | wall s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| clean | ee | short | 15 | 815 | 68.5 | 27.5 | 68.5 | 260516 | 10121 | 257 | 275 | 591 |
+| h1 | ee | short | 15 | 856 | 81.4 | 38.4 | 81.4 | 332331 | 11918 | 286 | 245 | 598 |
+| h2 | ee | short | 15 | 819 | 68.1 | 26.9 | 68.1 | 264860 | 10473 | 246 | 222 | 532 |
+| h3 | ee | short | 15 | 899 | 45.5 | 0.5 | 91.1 | 289518 | 19346 | 409 | 183 | 664 |
+| h4 | ee | short | 15 | 861 | 68.6 | 24.9 | 68.6 | 268941 | 10445 | 247 | 235 | 543 |
+
+
+(milestones and combinations pending)
+
+## 6. Costs
 
 (pending)
 
-## 6. Limitations and known issues
+## 7. Limitations and known issues
 
 - The home posture is a straight-arm singularity; the first descent from it uses joint-space interpolation and usually ends one slot late (`partial`).
 - Base velocities below 0.25 do not move the base (installed controller dead zone); the base is blocked by furniture in most initial poses in the forward direction and, once pressed against the counter, also sideways.
