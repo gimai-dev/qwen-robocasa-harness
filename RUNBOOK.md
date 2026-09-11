@@ -77,6 +77,21 @@ $PY -m direct.recovery select --bank /home/jli/state/qwen-direct/banks/recovery 
 $PY -m direct.recovery continue --bank /home/jli/state/qwen-direct/banks/recovery --methods clean h8 --out /home/jli/state/qwen-direct/recovery/<name> --parallel 2
 ```
 
+## Matrices actually run (2026-09-10/11)
+
+| Block | Command (from the frozen checkout) | Output |
+|---|---|---|
+| Phase B clean | `direct.matrix --tasks <3 tasks> --seeds 0 1 2 --interfaces ee joint --modes short full --methods clean --parallel 3` | `matrix/phaseB-clean` |
+| Phase C screen | `direct/tests/launch_phaseC.sh` (EE-short clean h1 h2 h4 h4c h5 h3 h8; joint-short clean h2; EE-full clean h3) | `matrix/phaseC-{ee-short,joint-short,ee-full}` |
+| Phase C H6 | `direct.matrix ... --methods h6 --method-config '{"bank": ".../banks/phaseC/h6-failures.json"}' --parallel 1` | `matrix/phaseC-h6` |
+| H8 recovery | `direct.recovery inspect/select/continue` (states from `banks/recovery-all`) | `recovery/phaseC-states` |
+| Phase D singles | `direct.matrix ... --seeds 10 11 12 13 14 --methods clean h1 h2 h3 h4 --parallel 3` | `matrix/phaseD-singles` |
+| Phase D combos | `direct.matrix ... --seeds 10 11 12 13 14 --methods h1+h2 h3+h4 --parallel 3` | `matrix/phaseD-combos` |
+| Phase E test | `direct.matrix ... --seeds 100..119 --methods clean h2 --parallel 3` | `matrix/phaseE-test` (two infrastructure-failed attempts kept in `matrix/phaseE-test-infra`, rerun on the same scenes) |
+| Milestones | `direct.recovery.inspect_run` over each matrix, then `direct.milestones` | `banks/*-inspect`, `matrix/*-milestones.md` |
+
+Milestone inspection restores every snapshot of a run in a sandboxed child and reads object pose, gripper contact and the official predicate; it is evaluator-side only.
+
 ## Protocol constants (executor level)
 
 | Constant | Value | Where |
