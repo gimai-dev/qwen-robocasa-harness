@@ -193,7 +193,20 @@ No condition reaches any complete-task success on unseen development seeds. H3 r
 
 On validation the only local-progress signal that replicates from development is H2 (relative actions): it brings the gripper within 10 cm of the object in 5 of 15 starts (clean 2 of 15; in Phase C 2 of 9 vs 0 of 9) and holds it in 3 (clean 2). H1, H3 and H4 do not exceed clean on any milestone on validation; H4's single Phase C lift did not recur. Clean itself lifted an object twice on validation (CounterToDrawer and StoveToCounter seed 13) and carried it once, all without completing the task. Counts of 0-5 out of 15 do not separate any condition statistically.
 
-(combinations pending)
+### Combinations on the same 15 validation starts (done 2026-09-11)
+
+Chosen from the Phase C milestones (success gave no signal): H1+H2 (both improved approach) and H3+H4 (both produced a held grasp). Matrix `/home/jli/state/qwen-direct/matrix/phaseD-combos`; tables in `results-direct/phaseD-all-results.md`.
+
+| Condition | Success / attempts | vs components | Cost notes |
+|---|---|---|---|
+| H1+H2 | 0/15 | H1 0/15, H2 0/15, clean 0/15 | 72 decisions, 27 rejected, 300k prompt tokens |
+| H3+H4 | 0/15 | H3 0/15, H4 0/15, clean 0/15 | 44 decisions, 0.3 rejected, 88 calls, 21k completion tokens |
+
+Neither combination changes complete-task success; the paired differences against clean and against each component are zero. (Combination milestones: pending.)
+
+### Phase E decision
+
+No candidate reached a single complete-task success on the 15 validation starts, so no candidate qualifies by the plan's criterion. Following the rule to adjust the count and explain, the confirmatory test runs clean and one candidate: H2, the only condition whose local-progress advantage replicated from development (approach 2/9 vs 0/9) to validation (5/15 vs 2/15). H1, H3, H4 and both combinations are reported as unsupported. Code, prompts and configuration are frozen at the Phase C/D checkout (no memory conditions are involved).
 
 ## 6. Costs
 
