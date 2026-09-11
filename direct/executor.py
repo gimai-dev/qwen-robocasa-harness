@@ -242,3 +242,18 @@ def execute(sim: Simulator, action: Action, *, slot_steps: int = SLOT_STEPS,
     else:
         status = "completed"
     return Receipt(status, action, steps, detail, child)
+
+
+READY_Q = (0.0, -0.35, 0.0, -2.0, 0.0, 1.65, 0.785)
+
+
+def move_to_ready(sim: Simulator, max_slots: int = 3) -> Receipt:
+    """Task-agnostic pre-episode move out of the straight-arm home singularity.
+    The elbow travels about 1.9 rad, more than one 20-step slot allows, so up to
+    ``max_slots`` slots are used; the returned receipt is the last one."""
+    receipt = None
+    for _ in range(max_slots):
+        receipt = execute(sim, Action("joint", q_rad=READY_Q, gripper=1, note="ready pose"), slot_steps=SLOT_STEPS)
+        if receipt.child is None or receipt.child["final_joint_error_rad"] < 0.05:
+            break
+    return receipt

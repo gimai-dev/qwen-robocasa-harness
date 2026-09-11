@@ -58,7 +58,7 @@ class Episode:
             "steps_budget": args.steps_budget, "wall_budget_s": args.wall_budget_s, "max_decisions": args.max_decisions,
             "slot_steps": SLOT_STEPS, "max_full_slots": MAX_FULL_SLOTS, "max_tokens_short": MAX_TOKENS_SHORT,
             "max_tokens_full": MAX_TOKENS_FULL, "code_revision": git_revision(), "method_config": json.loads(args.method_config),
-            "restore_from": args.restore_from,
+            "restore_from": args.restore_from, "ready_pose": bool(getattr(args, "ready_pose", False)),
         }
         self.method = make_method(args.method, run=self.run, config=self.config["method_config"])
         self.system_prompt = load_system_prompt(args.interface, args.mode, self.method.prompt_suffix())
@@ -250,6 +250,10 @@ class Episode:
                                  action_budget=self.args.steps_budget, wall_budget_s=self.args.wall_budget_s,
                                  restore_from=Path(self.args.restore_from) if self.args.restore_from else None)
             self.sim.launch()
+            if getattr(self.args, "ready_pose", False):
+                from .executor import move_to_ready
+                ready = move_to_ready(self.sim)
+                self.log_decision({"decision": 0, "status": "ready_pose", "steps": ready.steps, "receipt": ready.summary()})
             if self.args.history_from and self.args.history_decision:
                 self.load_history(Path(self.args.history_from), int(self.args.history_decision))
             self.started = time.monotonic()
@@ -317,6 +321,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--restore-from", default=None, help="H8: simulator snapshot to continue from")
     parser.add_argument("--history-from", default=None, help="H8: source run directory whose decision history precedes the snapshot")
     parser.add_argument("--history-decision", type=int, default=None, help="H8: last decision index of the source run before the snapshot")
+    parser.add_argument("--ready-pose", action="store_true", help="move to the non-singular ready pose before the first decision (20 steps, not a decision)")
     args = parser.parse_args(argv)
     result = Episode(args).run_episode()
     print(json.dumps({k: result[k] for k in ("task", "seed", "interface", "mode", "method", "official_success", "termination",
