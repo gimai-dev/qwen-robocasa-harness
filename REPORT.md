@@ -151,7 +151,7 @@ State bank: `results-direct/recovery/states.json` (5 states, selected evaluator-
 | clean | 0/5 | 0.00 | 4 ran the full 400 steps, 1 stopped after 40 steps |
 | H8 explicit recovery | 0/5 | 0.00 | 4 ran the full 400 steps (9-12 of 20 expectation checks were mismatches), 1 stopped at decision 1 with no motion |
 
-Recoverability of these five states is **unconfirmed**: the plan requires at least one independent continuation to complete the task within the budget, and none did. The table is therefore a paired comparison on states of unknown recoverability, not a recovery success rate; no L1-L4 breakdown is reported. Raw data: `/home/jli/state/qwen-direct/recovery/phaseC-states/`.
+Recoverability of these five states is **unconfirmed**: the plan requires at least one independent continuation to complete the task within the budget, and none did. The table is therefore a paired comparison on states of unknown recoverability, not a recovery success rate; no L1-L4 breakdown is reported. Evaluator-side milestones of the continuations (`results-direct/recovery/phaseC-states-milestones.md`) show the states are physically recoverable at least to a grasp: from the same 5 states, clean re-approached in 4, re-grasped (held) in 3, lifted in 2 and displaced the object by more than 10 cm in 3; H8 re-approached in 4, held in 3, lifted in 2 and displaced in 0. Neither completed the task within the 400-step recovery budget. Raw data: `/home/jli/state/qwen-direct/recovery/phaseC-states/`.
 
 ## 5. Costs
 
