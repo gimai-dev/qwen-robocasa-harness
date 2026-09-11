@@ -1,0 +1,97 @@
+# RUNBOOK: direct numerical Qwen control (branch `direct-control`)
+
+## Checkouts and locations
+
+| What | Where |
+|---|---|
+| Working repository (Mac) | `/Users/jiachen/Desktop/first try/qwen-direct-control`, branch `direct-control` (cloned from the published harness at `/Users/jiachen/Documents/Codex/2026-09-06/ban/publish/qwen-robocasa-harness`, history preserved) |
+| Runtime checkout (h200-4) | `/home/jli/work/qwen-direct-control` (rsync mirror of the Mac repo; `.git`, `videos/`, `results/` excluded) |
+| New code | `direct/` package (kinematics, actions, sim_child, executor, perception, sam_server, observation, policy, methods, harnesses, episode, matrix) |
+| Shared runtime modules | `runtime/robocasa_inspect/` (identical to `/home/jli/work/robocasa-inspect-official/robocasa_inspect`, verified by diff 2026-09-10) |
+| Episode outputs | `/home/jli/state/qwen-direct/runs/<name>` (single episodes), `/home/jli/state/qwen-direct/matrix/<name>` (matrices) |
+| Pinned initial scenes | `/home/jli/state/qwen-direct/scenes/<Task>-seed<N>.json` (model XML + flattened state + ep_meta; created on first use, restored exactly afterwards) |
+| Simulator | `/home/jli/work/robocasa-inspect-official` (RoboCasa 1.0.1, robosuite 1.5.2, MuJoCo 3.3.1), Python `/home/jli/work/robocasa-inspect-official/.venv/bin/python` |
+| SAM | `/home/jli/state/qwen-rgb-sam2/.venv/bin/python`, checkpoint `sam2.1_hiera_small.pt`, run as a persistent CUDA server per episode (`direct/sam_server.py`) |
+| Qwen | vLLM `qwen3.8-27b-bf16` on `http://127.0.0.1:8002/v1` (h200-4), identity/attestation/token files under `/home/jli/state/panda-qwen38/` (env `QWEN_IDENTITY_MANIFEST`, `QWEN_SERVER_ATTESTATION`, `QWEN_API_TOKEN_FILE`; defaults built in) |
+
+Sync Mac -> box:
+
+```bash
+rsync -a --exclude .git --exclude videos --exclude results --exclude __pycache__ "/Users/jiachen/Desktop/first try/qwen-direct-control/" h200-4:/home/jli/work/qwen-direct-control/
+```
+
+## Commands (verified on h200-4)
+
+All commands run on the box with:
+
+```bash
+cd /home/jli/work/qwen-direct-control && export PYTHONPATH=/home/jli/work/qwen-direct-control:/home/jli/work/qwen-direct-control/runtime
+PY=/home/jli/work/robocasa-inspect-official/.venv/bin/python
+```
+
+Interface smoke test (FK, EE displacement, gripper polarity, 20-step receipts, base motion, unreachable rejection):
+
+```bash
+$PY direct/tests/smoke_child.py --run /home/jli/state/qwen-direct/smoke-N --scenes /home/jli/state/qwen-direct/scenes
+```
+
+Perception smoke test on a saved run:
+
+```bash
+$PY direct/tests/smoke_perception.py /home/jli/state/qwen-direct/smoke-N
+```
+
+One episode:
+
+```bash
+$PY -m direct.episode --task PickPlaceCounterToSink --seed 0 --interface ee --mode short --method clean --out /home/jli/state/qwen-direct/runs/<name>
+```
+
+Options: `--interface ee|joint`, `--mode short|full`, `--method clean|h1..h8`, `--method-config '{...}'`, `--steps-budget 900`, `--wall-budget-s 1200`, `--max-decisions 180`, `--scenes DIR`, `--restore-from SNAPSHOT` (H8).
+
+Matrix:
+
+```bash
+$PY -m direct.matrix --tasks PickPlaceCounterToSink PickPlaceCounterToDrawer PickPlaceStoveToCounter --seeds 0 1 2 --interfaces ee joint --modes short full --methods clean --out /home/jli/state/qwen-direct/matrix/<name> --parallel 2
+```
+
+`summary.json` / `summary.md` are rewritten after every finished episode; a run directory with an existing `result.json` is reused, so a matrix can be resumed.
+
+## Protocol constants (executor level)
+
+| Constant | Value | Where |
+|---|---|---|
+| Control slot | 20 simulator steps (1.0 s at 20 Hz); every accepted action consumes the whole slot | `actions.SLOT_STEPS` |
+| Full-mode sequence | at most 45 slots | `actions.MAX_FULL_SLOTS` |
+| EE path | straight line in position, slerp in orientation, IK every 0.01 m / 2.5 deg, one waypoint per step (0.2 m/s) | `kinematics.plan_pose_segment` |
+| EE fallback | if the straight line has no local IK solution (straight-arm home posture), direct multi-start IK + joint-space interpolation when the largest joint move is <= 1.6 rad; receipt `path` says which | `executor.execute` |
+| Joint rate cap | 0.08 rad per step; tracking pauses when the measured lag exceeds 0.10 rad | `kinematics.MAX_JOINT_STEP`, `sim_child.TRACKING_LAG_PAUSE` |
+| Joint controller | JOINT_POSITION kp=150, damping ratio 1 (released harness configuration), torso absolute zero | `sim_child.joint_controller_config` |
+| Gripper | 0 closed / 1 open; drive +1 closed / -1 open inside robosuite; measured width `finger1 - finger2` (0.079 open, 0.002 closed empty) | `sim_child` |
+| Base | axis x/y/yaw, |v| <= 0.5, velocity for 10 steps then brake for 10; 0.5 -> 0.047 m or 0.216 rad per slot; arm joints held, chassis hold during arm motion | `actions`, `sim_child.execute_base`, `chassis_hold` |
+| Orientation frame | FK `grip_site` frame (+z approach out of the gripper, fingers close along local x); the public eef quaternion is this frame rotated 90 deg about z and is only logged | `sim_child._public_state` |
+| Budgets | 900 steps, 1200 s, 180 decisions (episode); rejected actions cost a decision, not steps | `episode` |
+| Qwen decoding | seed 3074294, temperature 0, top_p 1, thinking off, strict JSON schema; 1024 max tokens short, 4096 full | `policy` |
+| No-progress stop | 8 consecutive decisions without motion end the episode (`no_progress`) | `episode.MAX_CONSECUTIVE_NO_MOTION` |
+
+## Per-run artefacts
+
+`config.json`, `system-prompt.txt`, `qwen-calls.jsonl` (full user text, raw output, usage, finish reason, latency), `decisions.jsonl` (action, receipt, status), `perception/<decision>/regions.json` + masks, `sim/frames/<seq>/{left,right,wrist}.png`, `sim/mailbox/*.json` (every command and observation with per-step tracking trace), `sim/scene.json`, `sim/terminal-outcome.json` (official predicate), `episode.mp4` (10 fps mosaic, one frame per 4 steps), `result.json`.
+
+## Phase A record (2026-09-10)
+
+Interface checks, run `smoke-7` on CounterToSink seed 0 ("Pick the orange from the counter and place it in the sink."):
+
+| Check | Detects | Result |
+|---|---|---|
+| FK chain vs public relative TCP | joint order / frame error | 1.8e-8 m |
+| EE +0.05 m world x | transform, unit, sign | moved (+0.0498, +0.0001, -0.0001) m in 20 steps, straight line, 5 IK waypoints |
+| EE -0.05 m z from home | singular posture handling | straight line unsolvable; joint-space fallback used; slot ended partial (TCP first rises as the elbow bends) - documented limitation |
+| Gripper close / open | polarity, duration | width 0.0794 -> 0.0019 -> 0.0781 m, 20 steps each |
+| Joint1 +0.2 rad | joint order | error 0.0007 rad after 20 steps |
+| Base x 0.5 | base coordinate update | base +0.0471 m, TCP +0.0473 m, arm error 0.0006 rad |
+| Base yaw 0.5 | yaw sign | +0.2157 rad |
+| Target 3 m away | rejection | `unreachable`, 0 steps |
+| finish | official predicate | evaluated, `finished_false`, terminal outcome sealed |
+
+Timings: child launch about 20 s; one 20-step slot about 1.1 s; SAM server start about 6 s; SAM three views about 0.5 s.

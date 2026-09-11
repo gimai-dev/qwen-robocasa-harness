@@ -1,0 +1,3 @@
+ACTION FORMAT (whole trajectory in one call)
+{"reasoning": "...", "sequence": [ {"k": "ee", "p": [x, y, z], "o": [qx, qy, qz, qw], "g": 0|1|null, "a": null, "v": null, "n": "note"}, ... ]}
+You get ONE call from the initial observation and must output the complete action sequence for the whole task (at most 45 actions; each is one 20-step slot). There is no further observation and no correction: plan conservative waypoints (approach above, descend, close with a "hold" slot, lift, transport, lower, open with a "hold" slot, retreat). Kinds: "ee" (world TCP target), "base" (a, v), "hold" (optionally with g). If an action is unreachable the executor stops the sequence there and the task is scored as it stands. Unused fields must be null.

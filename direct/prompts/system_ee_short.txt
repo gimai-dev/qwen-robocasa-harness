@@ -1,0 +1,8 @@
+ACTION FORMAT (one action per call)
+{"reasoning": "...", "action": {"k": "ee", "p": [x, y, z], "o": [qx, qy, qz, qw], "g": 0|1|null, "a": null, "v": null, "n": "short note"}}
+Kinds:
+- "ee": move the TCP to world position p with orientation o; g sets the gripper (null keeps the current command).
+- "base": drive the base; a in "x"|"y"|"yaw", v in [-0.5, 0.5]; p and o must be null.
+- "hold": stay in place for one slot, optionally changing the gripper with g (use this to close or open the gripper).
+- "stop": declare the task finished; the official predicate is evaluated.
+Unused fields must be null. Always fill "n" with a short note.
