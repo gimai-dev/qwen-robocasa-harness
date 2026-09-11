@@ -180,7 +180,20 @@ No condition reaches any complete-task success on unseen development seeds. H3 r
 | h4 | ee | short | 15 | 861 | 68.6 | 24.9 | 68.6 | 268941 | 10445 | 247 | 235 | 543 |
 
 
-(milestones and combinations pending)
+#### Local-progress milestones on validation (evaluator-side; `results-direct/phaseD-singles-milestones.md`)
+
+| method | n | approach<=0.10m | contact | hold | lift>=3cm | displaced>=10cm | success | median closest dist m |
+|---|---|---|---|---|---|---|---|---|
+| clean | 15 | 2 | 2 | 2 | 2 | 1 | 0 | 0.664 |
+| h1 | 15 | 1 | 1 | 1 | 1 | 1 | 0 | 0.694 |
+| h2 | 15 | 5 | 5 | 3 | 1 | 1 | 0 | 0.453 |
+| h3 | 15 | 2 | 2 | 1 | 1 | 1 | 0 | 0.624 |
+| h4 | 15 | 1 | 1 | 0 | 0 | 0 | 0 | 0.599 |
+
+
+On validation the only local-progress signal that replicates from development is H2 (relative actions): it brings the gripper within 10 cm of the object in 5 of 15 starts (clean 2 of 15; in Phase C 2 of 9 vs 0 of 9) and holds it in 3 (clean 2). H1, H3 and H4 do not exceed clean on any milestone on validation; H4's single Phase C lift did not recur. Clean itself lifted an object twice on validation (CounterToDrawer and StoveToCounter seed 13) and carried it once, all without completing the task. Counts of 0-5 out of 15 do not separate any condition statistically.
+
+(combinations pending)
 
 ## 6. Costs
 
