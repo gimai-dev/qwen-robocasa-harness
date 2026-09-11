@@ -55,6 +55,7 @@ class QwenDirectClient:
         self.prompt_tokens = 0
         self.completion_tokens = 0
         self.latency_s = 0.0
+        self.by_category: dict[str, dict[str, float]] = {}
 
     def complete(self, *, system_prompt: str, user_text: str, images: Sequence[tuple[str, bytes]],
                  response_schema: Mapping[str, object], max_tokens: int, category: str,
@@ -96,6 +97,11 @@ class QwenDirectClient:
         usage = body.get("usage", {})
         self.prompt_tokens += int(usage.get("prompt_tokens", 0))
         self.completion_tokens += int(usage.get("completion_tokens", 0))
+        bucket = self.by_category.setdefault(category, {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0, "latency_s": 0.0})
+        bucket["calls"] += 1
+        bucket["prompt_tokens"] += int(usage.get("prompt_tokens", 0))
+        bucket["completion_tokens"] += int(usage.get("completion_tokens", 0))
+        bucket["latency_s"] += latency
         record.update({"raw": raw, "finish_reason": choice.get("finish_reason"), "usage": usage})
         parsed = None
         try:
@@ -115,7 +121,8 @@ class QwenDirectClient:
 
     def totals(self) -> dict:
         return {"qwen_calls": self.calls, "prompt_tokens": self.prompt_tokens,
-                "completion_tokens": self.completion_tokens, "qwen_latency_s": round(self.latency_s, 1)}
+                "completion_tokens": self.completion_tokens, "qwen_latency_s": round(self.latency_s, 1),
+                "qwen_by_category": {k: {**v, "latency_s": round(v["latency_s"], 1)} for k, v in self.by_category.items()}}
 
     def close(self) -> None:
         self.http.close()
