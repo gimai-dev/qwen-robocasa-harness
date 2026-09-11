@@ -48,17 +48,25 @@ def failure_records(result, decisions):
                       "effect": f"gripper closed on nothing (width {receipt['gripper_width_after_m']:.4f} m)"}
         if record is None:
             continue
-        # verified correction: the next motion decision of a different kind/target that produced motion or a non-empty grasp
+        # verified correction: only an outcome that fixes THIS failure type counts; anything else stays a hypothesis
         correction = None
         for later in decisions[index + 1:index + 4]:
-            if later.get("steps", 0) > 0 and later.get("action") != action:
-                lr = later.get("receipt") or {}
-                if record["effect"].startswith("gripper closed on nothing"):
-                    if later["action"].get("g") == 0 and (lr.get("gripper_width_after_m") or 0) > 0.005:
-                        correction = {"action": later["action"], "effect": f"grasp width {lr['gripper_width_after_m']:.4f} m"}
-                        break
-                elif later.get("status") in ("completed", "partial"):
-                    correction = {"action": later["action"], "effect": f"moved to {lr.get('tcp_world_after_m')}"}
+            if later.get("steps", 0) <= 0 or later.get("action") == action:
+                continue
+            lr = later.get("receipt") or {}
+            la = later["action"]
+            if status == "unreachable":
+                if la.get("k") == "ee" and later.get("status") == "completed":
+                    correction = {"action": la, "effect": f"reachable target completed at {lr.get('tcp_world_after_m')}"}
+                    break
+            elif record["context"] == "base command against furniture":
+                moved = lr.get("base_moved_m")
+                if la.get("k") == "base" and la.get("a") != action.get("a") and moved and max(abs(v) for v in moved[:2]) >= 0.05:
+                    correction = {"action": la, "effect": f"base moved {moved}"}
+                    break
+            elif record["effect"].startswith("gripper closed on nothing"):
+                if la.get("g") == 0 and (lr.get("gripper_width_after_m") or 0) > 0.005:
+                    correction = {"action": la, "effect": f"grasp width {lr['gripper_width_after_m']:.4f} m"}
                     break
         record["correction"] = correction
         record["correction_verified"] = correction is not None
