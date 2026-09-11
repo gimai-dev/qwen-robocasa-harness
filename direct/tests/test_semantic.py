@@ -47,3 +47,20 @@ def test_gripper_tokens_and_done():
 def test_base_tokens():
     a = Interpreter().to_action("BASE_LEFT", STATE, fine=True)
     assert a.kind == "base" and a.axis == "y" and a.velocity == 0.5
+
+from direct.semantic_plugins import RecentMoves, Recovery
+
+
+def test_recent_moves_window_and_annotation():
+    r = RecentMoves(n=3)
+    for t, s in (("MV_FWD", "completed"), ("MV_FWD", "blocked"), ("GRASP", "completed"), ("MV_UP", "completed")):
+        r.push(t, s)
+    assert r.text() == ["MV_FWD(blocked)", "GRASP", "MV_UP"]
+
+
+def test_recovery_forces_release_after_empty_close():
+    rec = Recovery()
+    forced, rollback = rec.check("GRASP", {"status": "completed", "gripper_width_after_m": 0.002}, {"gripper": "closed on nothing"})
+    assert forced == "RELEASE" and rollback is True
+    forced, rollback = rec.check("GRASP", {"status": "completed", "gripper_width_after_m": 0.05}, {"gripper": "closed, holding something (gap 0.050 m)"})
+    assert forced is None and rollback is False
