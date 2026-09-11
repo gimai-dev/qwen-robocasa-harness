@@ -129,6 +129,17 @@ Note on Phase B vs Phase C clean: the Phase B clean run that succeeded (CounterT
 
 
 
+### Additional lanes (counted separately, same nine starts, same code)
+
+| Lane | Condition | Success | Notes |
+|---|---|---|---|
+| Joint-short | clean | 0/9 | no rejected actions; mean 43 decisions, 829 steps, 427 s |
+| Joint-short | H2 delta-q | 0/9 | paired diff 0; mean 44 decisions, 771 steps |
+| EE-full | clean | 0/9 | one-shot plans of 1 to 10 actions (143-724 completion tokens); 3 ended at an unreachable slot, 6 completed their short plan |
+| EE-full | H3 candidates + preview | 0/9 | 2 counted calls per episode; chosen plans of 1-2 actions (mean 18 steps); one call hit the 4,096-token limit (`truncated_output`, no motion executed) |
+
+The 4,096-token bound is not what limits full mode: the longest clean plan (10 actions) used 724 tokens. Qwen writes short one-shot plans and stops.
+
 ## 5. Costs
 
 (pending)
