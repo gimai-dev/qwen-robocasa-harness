@@ -92,6 +92,7 @@ $PY -m direct.recovery continue --bank /home/jli/state/qwen-direct/banks/recover
 | Orientation frame | FK `grip_site` frame (+z approach out of the gripper, fingers close along local x); the public eef quaternion is this frame rotated 90 deg about z and is only logged | `sim_child._public_state` |
 | Budgets | 900 steps, 1200 s, 180 decisions (episode); rejected actions cost a decision, not steps | `episode` |
 | Contact force | scalar: wrist force magnitude minus the free-hanging baseline magnitude (the sensor bias rotates with the wrist, so vector deltas are meaningless); Phase B ran with the earlier vector form | `sim_child.publish` |
+| SAM prompt grid | 16x16 points per view from Phase C on (Phase B used 24x24: 2.6x slower under GPU contention, 13 vs 8 regions on the CounterToSink seed-0 start, same target object found) | `sam_server` |
 | Snapshots | full simulator state saved at every observation under `sim/snapshots/` (evaluator-side; used by `direct.recovery`) | `sim_child.publish` |
 | Qwen decoding | seed 3074294, temperature 0, top_p 1, thinking off, strict JSON schema; 1024 max tokens short, 4096 full | `policy` |
 | No-progress stop | 8 consecutive decisions without motion end the episode (`no_progress`) | `episode.MAX_CONSECUTIVE_NO_MOTION` |

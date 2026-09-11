@@ -26,7 +26,7 @@ def main() -> None:
     torch.set_num_interop_threads(1)
     model = build_sam2("configs/sam2.1/sam2.1_hiera_s.yaml", str(ROOT / "sam2.1_hiera_small.pt"),
                        device="cuda", apply_postprocessing=False)
-    generator = SAM2AutomaticMaskGenerator(model, points_per_side=24, points_per_batch=64,
+    generator = SAM2AutomaticMaskGenerator(model, points_per_side=16, points_per_batch=64,
                                            pred_iou_thresh=0.8, stability_score_thresh=0.9, crop_n_layers=0)
     sys.stdout.write(json.dumps({"ready": True, "model": "sam2.1_hiera_small", "device": "cuda"}) + "\n")
     sys.stdout.flush()
