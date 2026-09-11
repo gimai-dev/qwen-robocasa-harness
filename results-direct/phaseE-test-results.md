@@ -6,7 +6,7 @@ Runs: 120 from /home/jli/state/qwen-direct/matrix/phaseE-test
 
 | method | interface | mode | task | success/attempts | terminations |
 |---|---|---|---|---|---|
-| clean | ee | short | PickPlaceCounterToDrawer | 0/20 | {'stop': 9, 'step_budget': 9, 'infrastructure_error': 2} |
+| clean | ee | short | PickPlaceCounterToDrawer | 0/20 | {'stop': 9, 'step_budget': 11} |
 | clean | ee | short | PickPlaceCounterToSink | 1/20 | {'step_budget': 15, 'stop': 5} |
 | clean | ee | short | PickPlaceStoveToCounter | 0/20 | {'stop': 2, 'step_budget': 18} |
 | clean | ee | short | **all** | 1/60 | |
@@ -25,7 +25,7 @@ Runs: 120 from /home/jli/state/qwen-direct/matrix/phaseE-test
 
 | method | interface | mode | n | sim steps | decisions | rejected | Qwen calls | prompt tok | completion tok | Qwen s | SAM s | wall s |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| clean | ee | short | 60 | 861 | 66.1 | 22.8 | 66.1 | 254210 | 9649 | 230 | 230 | 517 |
+| clean | ee | short | 60 | 877 | 67.7 | 23.6 | 67.7 | 259849 | 9882 | 235 | 232 | 525 |
 | h2 | ee | short | 60 | 866 | 65.1 | 21.4 | 65.1 | 256333 | 9803 | 233 | 242 | 540 |
 
 ## Per-run outcomes
@@ -40,7 +40,7 @@ Runs: 120 from /home/jli/state/qwen-direct/matrix/phaseE-test
 | clean | ee | short | PickPlaceCounterToDrawer | 105 | False | stop | 840 | 61 | 524 | PickPlaceCounterToDrawer-s105-ee-short-clean |
 | clean | ee | short | PickPlaceCounterToDrawer | 106 | False | step_budget | 900 | 84 | 543 | PickPlaceCounterToDrawer-s106-ee-short-clean |
 | clean | ee | short | PickPlaceCounterToDrawer | 107 | False | stop | 880 | 90 | 600 | PickPlaceCounterToDrawer-s107-ee-short-clean |
-| clean | ee | short | PickPlaceCounterToDrawer | 108 | None | infrastructure_error | 560 | 44 | 342 | PickPlaceCounterToDrawer-s108-ee-short-clean |
+| clean | ee | short | PickPlaceCounterToDrawer | 108 | False | step_budget | 900 | 67 | 458 | PickPlaceCounterToDrawer-s108-ee-short-clean |
 | clean | ee | short | PickPlaceCounterToDrawer | 109 | False | stop | 880 | 84 | 628 | PickPlaceCounterToDrawer-s109-ee-short-clean |
 | clean | ee | short | PickPlaceCounterToDrawer | 110 | False | step_budget | 900 | 73 | 607 | PickPlaceCounterToDrawer-s110-ee-short-clean |
 | clean | ee | short | PickPlaceCounterToDrawer | 111 | False | stop | 880 | 79 | 606 | PickPlaceCounterToDrawer-s111-ee-short-clean |
@@ -49,7 +49,7 @@ Runs: 120 from /home/jli/state/qwen-direct/matrix/phaseE-test
 | clean | ee | short | PickPlaceCounterToDrawer | 114 | False | step_budget | 900 | 63 | 528 | PickPlaceCounterToDrawer-s114-ee-short-clean |
 | clean | ee | short | PickPlaceCounterToDrawer | 115 | False | stop | 880 | 56 | 453 | PickPlaceCounterToDrawer-s115-ee-short-clean |
 | clean | ee | short | PickPlaceCounterToDrawer | 116 | False | step_budget | 900 | 66 | 535 | PickPlaceCounterToDrawer-s116-ee-short-clean |
-| clean | ee | short | PickPlaceCounterToDrawer | 117 | None | infrastructure_error | 280 | 23 | 190 | PickPlaceCounterToDrawer-s117-ee-short-clean |
+| clean | ee | short | PickPlaceCounterToDrawer | 117 | False | step_budget | 900 | 94 | 562 | PickPlaceCounterToDrawer-s117-ee-short-clean |
 | clean | ee | short | PickPlaceCounterToDrawer | 118 | False | step_budget | 900 | 65 | 552 | PickPlaceCounterToDrawer-s118-ee-short-clean |
 | clean | ee | short | PickPlaceCounterToDrawer | 119 | False | stop | 880 | 64 | 561 | PickPlaceCounterToDrawer-s119-ee-short-clean |
 | clean | ee | short | PickPlaceCounterToSink | 100 | True | stop | 500 | 30 | 263 | PickPlaceCounterToSink-s100-ee-short-clean |

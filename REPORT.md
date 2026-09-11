@@ -210,7 +210,7 @@ No candidate reached a single complete-task success on the 15 validation starts,
 
 ## 6. Phase E: confirmatory test (frozen; done 2026-09-11)
 
-Conditions: clean and H2 (relative actions), EE-short, 3 tasks x 20 test seeds (100-119) = 60 starts each, 120 episodes. Code, prompts and configuration frozen at the Phase C/D checkout (commit 067e5fb plus the bank/combination modules, which the tested conditions do not use). Matrix `/home/jli/state/qwen-direct/matrix/phaseE-test`; tables in `results-direct/phaseE-test-results.md`. Two clean episodes (CounterToDrawer seeds 108 and 117) ended in `infrastructure_error` (the vLLM server dropped a connection mid-request); they are labelled as such, kept in `matrix/phaseE-test-infra`, and rerun on the same initial scenes.
+Conditions: clean and H2 (relative actions), EE-short, 3 tasks x 20 test seeds (100-119) = 60 starts each, 120 episodes. Code, prompts and configuration frozen at the Phase C/D checkout (commit 067e5fb plus the bank/combination modules, which the tested conditions do not use). Matrix `/home/jli/state/qwen-direct/matrix/phaseE-test`; tables in `results-direct/phaseE-test-results.md`. Two clean episodes (CounterToDrawer seeds 108 and 117) ended in `infrastructure_error` (the vLLM server dropped a connection mid-request); they are labelled as such, kept in `matrix/phaseE-test-infra`, and were rerun on the same initial scenes (both reruns failed at the step budget); the table below uses the reruns, so all 120 test episodes are complete.
 
 | Condition | CounterToSink | CounterToDrawer | StoveToCounter | All | Paired diff vs clean (n=60) |
 |---|---|---|---|---|---|
