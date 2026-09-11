@@ -208,12 +208,76 @@ Neither combination changes complete-task success; the paired differences agains
 
 No candidate reached a single complete-task success on the 15 validation starts, so no candidate qualifies by the plan's criterion. Following the rule to adjust the count and explain, the confirmatory test runs clean and one candidate: H2, the only condition whose local-progress advantage replicated from development (approach 2/9 vs 0/9) to validation (5/15 vs 2/15). H1, H3, H4 and both combinations are reported as unsupported. Code, prompts and configuration are frozen at the Phase C/D checkout (no memory conditions are involved).
 
-## 6. Costs
+## 6. Phase E: confirmatory test (frozen; done 2026-09-11)
 
-(pending)
+Conditions: clean and H2 (relative actions), EE-short, 3 tasks x 20 test seeds (100-119) = 60 starts each, 120 episodes. Code, prompts and configuration frozen at the Phase C/D checkout (commit 067e5fb plus the bank/combination modules, which the tested conditions do not use). Matrix `/home/jli/state/qwen-direct/matrix/phaseE-test`; tables in `results-direct/phaseE-test-results.md`. Two clean episodes (CounterToDrawer seeds 108 and 117) ended in `infrastructure_error` (the vLLM server dropped a connection mid-request); they are labelled as such, kept in `matrix/phaseE-test-infra`, and rerun on the same initial scenes.
 
-## 7. Limitations and known issues
+| Condition | CounterToSink | CounterToDrawer | StoveToCounter | All | Paired diff vs clean (n=60) |
+|---|---|---|---|---|---|
+| clean | 1/20 | 0/20 | 0/20 | 1/60 | - |
+| H2 relative actions | 1/20 | 0/20 | 0/20 | 1/60 | 0.000, bootstrap 95% interval [0, 0], 0 wins / 0 losses |
+
+Both successes are on the same start (CounterToSink seed 100: a glass cup; clean in 500 steps, H2 at the step budget). The paired difference is exactly zero on all 60 starts; the evidence is insufficient to distinguish H2 from clean on complete-task success, and the estimated success rate of the direct-control clean controller on unseen seeds is 1/60 (about 1.7%, exact binomial 95% interval 0.04% to 8.9%).
+
+#### Costs (means per episode)
+
+| method | interface | mode | n | sim steps | decisions | rejected | Qwen calls | prompt tok | completion tok | Qwen s | SAM s | wall s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| clean | ee | short | 60 | 861 | 66.1 | 22.8 | 66.1 | 254210 | 9649 | 230 | 230 | 517 |
+| h2 | ee | short | 60 | 866 | 65.1 | 21.4 | 65.1 | 256333 | 9803 | 233 | 242 | 540 |
+
+
+(test-set milestones pending)
+
+## 7. Phase F: transfer
+
+No approach was effective on complete-task success, so there is nothing to transfer. What was measured in other interfaces: H2 was already run in joint-short on the development starts (0/9, clean 0/9) and H3 in EE-full (0/9, clean 0/9); the remaining pick-and-place tasks were not run. Unseen-seed generalization is reported by Phase E (1/60 for both tested conditions); unseen-task generalization was not measured.
+
+## 8. Costs
+
+All episodes actually run on h200-4 (one H200, vLLM Qwen3.8-27B BF16 shared by up to 4 concurrent episodes, SAM2.1 small per episode). Wall time is per-episode wall summed over episodes, with 3 episodes usually in parallel; the calendar time for the whole campaign was about 30 hours.
+
+| Block | episodes | sim steps | Qwen calls | prompt tokens | completion tokens | Qwen s | SAM s | wall h |
+|---|---|---|---|---|---|---|---|---|
+| Phase B clean | 36 | 14760 | 916 | 3774266 | 143805 | 3546 | 6030 | 2.9 |
+| Phase C EE-short screen | 72 | 58460 | 5645 | 22223799 | 1047863 | 23804 | 19447 | 13.2 |
+| Phase C joint-short lane | 18 | 14400 | 782 | 3287858 | 118544 | 3256 | 3319 | 2.1 |
+| Phase C EE-full lane | 18 | 600 | 26 | 81390 | 12029 | 260 | 77 | 0.1 |
+| Phase C H6 | 9 | 6720 | 442 | 1844704 | 68398 | 1580 | 1304 | 0.9 |
+| H8 recovery continuations | 10 | 3240 | 179 | 741618 | 32217 | 857 | 777 | 0.5 |
+| Phase D singles | 75 | 63740 | 5666 | 21242485 | 934548 | 21688 | 17407 | 12.2 |
+| Phase D combinations | 30 | 26100 | 2396 | 8855647 | 473747 | 10377 | 6148 | 5.2 |
+| Phase E test | 118 | 102800 | 7808 | 30377265 | 1157573 | 27527 | 28071 | 17.5 |
+| Phase E infra-failed attempts | 2 | 840 | 67 | 255327 | 9539 | 228 | 252 | 0.1 |
+| development runs (Phase A, smoke) | 13 | 3140 | 143 | 566091 | 25221 | 588 | 389 | 0.3 |
+| **total** | 401 | 294800 | 24070 | 93250450 | 4023484 | 93711 | 83220 | 55.2 |
+
+Per-episode means are in each block's results table; a short-mode episode costs about 65 Qwen calls, 250k prompt tokens, 10k completion tokens and 9 minutes of wall time under 3-way contention (about 4 minutes alone). H3 doubles the calls and completion tokens. Full mode costs one or two calls and under 30 s.
+
+## 9. Recommendations for further work
+
+- The binding failure is target selection from 256x256 images plus region positions: the model rarely reaches the object (clean approach within 10 cm in 0/9 development and 2/15 validation starts). The two cheapest measured levers were the relative action representation (H2: approach 5/15) and kinematic previews (H3: rejections 0.5 per episode instead of 27). Neither converts into grasps at a useful rate. A next step with a plausible mechanism is a grasp-stage representation change rather than more history: e.g. wrist-camera-anchored displacement commands, or an explicit "descend until contact" primitive that Qwen parameterizes numerically.
+- The recovery evaluation shows the failure states are recoverable to a grasp (3/5 re-grasps for both clean and H8) but not to task completion within 400 steps; the bottleneck after re-grasp is transport and release, not recovery detection.
+- H6/H7 need real successes to build banks from; the one clean development success (Phase B) did not repeat under the Phase C interface, and no validated skill exists. Any bank-based condition should wait for a controller with a non-zero grasp rate.
+- Do not compare Phase B clean numbers with Phase C-E numbers: the interface changed between them (documented in section 3).
+
+## 10. Deliverables
+
+1. Shared runner and commands: `direct/` package, RUNBOOK.md (verified commands, constants, artefact layout).
+2. Clean trajectories and the four-condition screen: `results-direct/phaseB-clean/`, videos in each run directory (`episode.mp4`); representative success `matrix/phaseB-clean/PickPlaceCounterToSink-s0-ee-short-clean/episode.mp4`.
+3. Independent harness screening table: section 4, `results-direct/phaseC/`.
+4. Validation and combinations: section 5, `results-direct/phaseD-*`.
+5. Frozen test results, costs, videos: sections 6 and 8, `results-direct/phaseE-test-results.md`, success videos `matrix/phaseE-test/PickPlaceCounterToSink-s100-ee-short-clean/episode.mp4` and `.../-h2/episode.mp4`.
+6. H8 recovery table: section 4, `results-direct/recovery/`.
+7. RUNBOOK, configurations (`config.json` and `system-prompt.txt` in every run directory), raw data under `/home/jli/state/qwen-direct/` (25 GB).
+
+## 11. Limitations and known issues
 
 - The home posture is a straight-arm singularity; the first descent from it uses joint-space interpolation and usually ends one slot late (`partial`).
 - Base velocities below 0.25 do not move the base (installed controller dead zone); the base is blocked by furniture in most initial poses in the forward direction and, once pressed against the counter, also sideways.
 - SAM region ids are not stable across steps; positions are surface centroids, 1-3 cm above/outside the geometric centre.
+- Every condition was run once per start with greedy decoding; the deterministic trajectory changes with any prompt or perception change, so a single success (Phase B seed 0, Phase E seed 100) is not evidence of a stable rate.
+- Wall times include GPU contention from running three episodes plus SAM servers concurrently; timing comparisons between conditions within one block are fair, between blocks approximately so.
+- Milestones are computed from simulator state the policy never sees; they are diagnostic, not part of any objective.
+- The no-progress rule (8 consecutive decisions without motion) ended 6 Phase B episodes early; from Phase C on, after the reach and contact notes, it rarely triggered.
+- The Qwen server dropped two requests during Phase E (infrastructure errors, rerun on the same scenes).
