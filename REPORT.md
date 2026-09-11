@@ -73,7 +73,13 @@ Interface changes after Phase B, applied uniformly to every Phase C condition in
 
 ## 4. Phase C: independent harness screen
 
-(pending)
+### Prerequisite status
+
+- H7 (successful skills): **not run, prerequisite missing.** The bank builder found exactly one local grasp-and-lift fragment in the nine clean EE-short development runs (CounterToDrawer seed 1, wooden spoon, grasp width 0.010 m, no complete-task success) and no second development start on which to validate it. A skill that was never validated on another initial state would be a single-episode recipe, which the isolation rule for H7 excludes.
+- H6 (failure experience): run with the bank built from the nine Phase C clean EE-short runs (`/home/jli/state/qwen-direct/banks/phaseC/h6-failures.json`); records are unreachable targets, blocked base motions and empty closes with a correction marked verified only when a later action fixed the same failure type.
+- H8 recovery-state evaluation: pending selection of recoverable failure states from the evaluator-side inspection of the Phase C clean runs.
+
+(results pending)
 
 ## 5. Costs
 
