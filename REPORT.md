@@ -24,9 +24,52 @@ What happened: the model's first EE target (0.1 m above the orange, identity ori
 
 Development episodes used for integration before the freeze: 3 (EE-short, joint-short, EE-full on CounterToSink seed 0) plus 6 four-decision harness smoke runs. None counts toward Phase B.
 
-## 3. Phase B: four clean baselines
+## 3. Phase B: four clean baselines (done 2026-09-10)
 
-(pending: `/home/jli/state/qwen-direct/matrix/phaseB-clean/summary.md`)
+Code frozen at commit 7275128; matrix `/home/jli/state/qwen-direct/matrix/phaseB-clean` (36 episodes, 3 tasks x development seeds 0-2 x {EE, joint} x {short, full}, 3 episodes in parallel on h200-4). Machine-generated tables: `results-direct/phaseB-clean/phaseB-clean-results.md`.
+
+| Condition | Success / attempts | Notes |
+|---|---|---|
+| EE-short | 1/9 | CounterToSink seed 0 succeeded (48 decisions, 760 steps); 3 runs ended by the no-progress rule (8 consecutive rejected targets), 5 ran to a model `stop` or the step budget |
+| Joint-short | 0/9 | no rejected actions (joint targets are always executable) but no grasp; 6 model stops, 3 step-budget ends |
+| EE-full | 0/9 | one-shot sequences of 1 to 4 actions (mean 31 simulator steps); 6 of 9 ended at an unreachable slot, 3 completed their short sequence |
+| Joint-full | 0/9 | one-shot sequences of 1 to 14 joint actions, all executed, none reaching the object |
+
+### Success per condition and task
+
+| method | interface | mode | task | success/attempts | terminations |
+|---|---|---|---|---|---|
+| clean | ee | full | PickPlaceCounterToDrawer | 0/3 | {'sequence_complete': 1, 'unreachable_at_slot_1': 1, 'unreachable_at_slot_4': 1} |
+| clean | ee | full | PickPlaceCounterToSink | 0/3 | {'sequence_complete': 1, 'unreachable_at_slot_3': 1, 'unreachable_at_slot_2': 1} |
+| clean | ee | full | PickPlaceStoveToCounter | 0/3 | {'unreachable_at_slot_3': 2, 'sequence_complete': 1} |
+| clean | ee | full | **all** | 0/9 | |
+| clean | ee | short | PickPlaceCounterToDrawer | 0/3 | {'no_progress': 2, 'step_budget': 1} |
+| clean | ee | short | PickPlaceCounterToSink | 1/3 | {'stop': 2, 'no_progress': 1} |
+| clean | ee | short | PickPlaceStoveToCounter | 0/3 | {'no_progress': 1, 'stop': 2} |
+| clean | ee | short | **all** | 1/9 | |
+| clean | joint | full | PickPlaceCounterToDrawer | 0/3 | {'sequence_complete': 3} |
+| clean | joint | full | PickPlaceCounterToSink | 0/3 | {'sequence_complete': 3} |
+| clean | joint | full | PickPlaceStoveToCounter | 0/3 | {'sequence_complete': 3} |
+| clean | joint | full | **all** | 0/9 | |
+| clean | joint | short | PickPlaceCounterToDrawer | 0/3 | {'stop': 2, 'step_budget': 1} |
+| clean | joint | short | PickPlaceCounterToSink | 0/3 | {'stop': 2, 'step_budget': 1} |
+| clean | joint | short | PickPlaceStoveToCounter | 0/3 | {'stop': 2, 'step_budget': 1} |
+| clean | joint | short | **all** | 0/9 | |
+
+
+### Costs (means per episode)
+
+| method | interface | mode | n | sim steps | decisions | rejected | Qwen calls | prompt tok | completion tok | Qwen s | SAM s | wall s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| clean | ee | full | 9 | 31 | 1.0 | 0.7 | 1.0 | 3611 | 467 | 10 | 6 | 20 |
+| clean | ee | short | 9 | 576 | 53.7 | 24.4 | 53.7 | 213994 | 7950 | 206 | 372 | 620 |
+| clean | joint | full | 9 | 149 | 1.0 | 0.0 | 1.0 | 3739 | 474 | 9 | 3 | 22 |
+| clean | joint | short | 9 | 884 | 46.1 | 0.0 | 46.1 | 198019 | 7087 | 169 | 288 | 515 |
+
+
+What the traces show (EE-short): the dominant failure is target selection, not execution. Rejected targets were either beyond reach (0.7 m or more from the shoulder) or directly above the base at 1.6-1.8 m height; the base was blocked by furniture in the forward direction in every start and Qwen kept pushing it; when the arm did reach the object's neighbourhood it pressed on furniture (47-62 N) and the model did not interpret the force field (it read "holding the pizza cutter" with the gripper open). Full modes produce very short one-shot plans (1-4 EE actions) that stop at the first unreachable target; the 4,096-token limit was never reached (max 474 completion tokens), so truncation is not the cause.
+
+Interface changes after Phase B, applied uniformly to every Phase C condition including its own clean control: contact force reported as norm growth over the free-hanging baseline (the vector form read a constant 214 N); partial receipts name contact blocking when the commanded path was exhausted under force; the prompt states the minimum horizontal reach; SAM prompt grid 16x16 (SAM was 60% of wall time under 3-way GPU contention).
 
 ## 4. Phase C: independent harness screen
 
