@@ -45,7 +45,8 @@ class H3ProposePreview(Method):
                 "The executor previews each candidate with forward/inverse kinematics only (reachability, predicted TCP position, "
                 "the target drawn as a labelled marker in the current images). You then receive the preview and choose one "
                 "(`choice` A/B/C) or output a revised action (`choice` \"revise\" with `action`). No physical outcome is simulated. "
-                "The second call is counted against the decision budget.")
+                "The second call is counted against the decision budget. In full mode the candidates are 2 to 3 complete sequences and the "
+                "preview draws each predicted TCP path.")
 
     def _preview(self, ctx, candidates):
         obs = ctx["observation"]; state = obs["public_state"]; cal = obs["camera_calibration"]
@@ -111,8 +112,80 @@ class H3ProposePreview(Method):
             images.append((f"preview_{view}", buffer.getvalue()))
         return rows, images
 
-    def revise(self, ctx, call, action):
-        raise NotImplementedError  # H3 uses choose() from the episode's candidate path
+    def full_schema(self, interface):
+        from .actions import MAX_FULL_SLOTS
+        self.interface = interface
+        seq = {"type": "array", "minItems": 1, "maxItems": MAX_FULL_SLOTS, "items": action_schema(interface=interface, allow_stop=False)}
+        return {"type": "object", "additionalProperties": False,
+                "properties": {"reasoning": {"type": "string"}, "candidates": {"type": "array", "minItems": 2, "maxItems": 3, "items": seq}},
+                "required": ["reasoning", "candidates"]}
+
+    def revise_sequence(self, ctx, call):
+        """Full-mode transfer: preview 2-3 candidate sequences as predicted TCP polylines, then select/revise once."""
+        obs = ctx["observation"]; state = obs["public_state"]; cal = obs["camera_calibration"]
+        candidates = call["parsed"].get("candidates") or []
+        rows, paths = [], []
+        for index, sequence in enumerate(candidates[:3]):
+            tcp = list(state["tcp_world_position_m"]); q = list(state["arm_q_rad"]); yaw = state["base_world_yaw_rad"]
+            points, first_problem = [tuple(tcp)], None
+            for slot, raw in enumerate(sequence, start=1):
+                try:
+                    action = decode_action(raw, interface=self.interface, current_tcp_world=tcp, current_q=q)
+                except ValueError as error:
+                    first_problem = {"slot": slot, "error": str(error)}; break
+                if action.kind == "ee":
+                    p_base, r_base = world_to_base(action.position_m, ee_rotation_matrix(action), state["base_world_position_m"], state["base_world_quat_xyzw"])
+                    plan = plan_pose_segment(q, p_base, r_base)
+                    if plan["status"] != "kinematically_reachable":
+                        direct = solve_pose_multistart(q, p_base, r_base)
+                        if not (direct["status"] == "kinematically_reachable" and direct["max_joint_delta_rad"] <= 1.6):
+                            first_problem = {"slot": slot, "error": "unreachable"}; break
+                        q = direct["q"]
+                    else:
+                        q = plan["waypoints"][-1]
+                    tcp = list(action.position_m)
+                elif action.kind == "joint":
+                    q = list(action.q_rad); p, r = panda_fk(q)
+                    tcp = [float(v) for v in base_to_world(p, r, state["base_world_position_m"], state["base_world_quat_xyzw"])[0]]
+                elif action.kind == "base":
+                    d = 0.66 * max(0.0, abs(action.velocity) - 0.25) * np.sign(action.velocity)
+                    if action.axis == "x":
+                        tcp = (np.asarray(tcp) + d * np.array([np.cos(yaw), np.sin(yaw), 0])).tolist()
+                    elif action.axis == "y":
+                        tcp = (np.asarray(tcp) + d * np.array([-np.sin(yaw), np.cos(yaw), 0])).tolist()
+                points.append(tuple(tcp))
+            rows.append({"label": LABELS[index], "length": len(sequence), "kinematic_check": "all reachable" if first_problem is None else first_problem,
+                         "predicted_tcp_path_m": [[round(v, 3) for v in p] for p in points]})
+            paths.append(points)
+        images = []
+        for view in ("left", "right", "wrist"):
+            image = Image.open(io.BytesIO(ctx["images"][view])).convert("RGB"); draw = ImageDraw.Draw(image)
+            for index, points in enumerate(paths):
+                pixels = [_project(cal[view], p) for p in points]
+                for a, b in zip(pixels, pixels[1:]):
+                    if a and b:
+                        draw.line([a, b], fill=COLORS[index], width=2)
+                if pixels and pixels[-1]:
+                    draw.text(pixels[-1], LABELS[index], fill=COLORS[index])
+            buffer = io.BytesIO(); image.save(buffer, format="PNG"); images.append((f"preview_{view}", buffer.getvalue()))
+        (self.run / "previews").mkdir(exist_ok=True)
+        (self.run / "previews" / "full.json").write_text(json.dumps(rows, indent=1))
+        from .actions import MAX_FULL_SLOTS
+        seq_schema = {"type": "array", "minItems": 1, "maxItems": MAX_FULL_SLOTS, "items": action_schema(interface=self.interface, allow_stop=False)}
+        schema = {"type": "object", "additionalProperties": False,
+                  "properties": {"reasoning": {"type": "string"}, "choice": {"type": "string", "enum": [*LABELS[:len(rows)], "revise"]},
+                                 "sequence": {"anyOf": [seq_schema, {"type": "null"}]}},
+                  "required": ["reasoning", "choice", "sequence"]}
+        text = json.dumps({"preview_of_your_candidate_sequences": rows,
+                           "instruction": "Kinematic preview only (no contacts simulated). Choose A/B/C, or choice=\"revise\" with a revised full sequence."}, separators=(",", ":"))
+        from .policy import MAX_TOKENS_FULL
+        second = ctx["client"].complete(system_prompt=ctx["system_prompt"], user_text=text, images=images, response_schema=schema,
+                                        max_tokens=MAX_TOKENS_FULL, category="preview_select", decision=1)
+        choice = second["parsed"].get("choice")
+        chosen = candidates[LABELS.index(choice)] if choice in LABELS and LABELS.index(choice) < len(candidates) else second["parsed"].get("sequence")
+        with (self.run / "preview-choices.jsonl").open("a") as handle:
+            handle.write(json.dumps({"decision": 1, "candidates": rows, "choice": choice}) + "\n")
+        return {**second, "parsed": {"reasoning": second["parsed"].get("reasoning"), "sequence": chosen or []}, "truncated": call.get("truncated") or second.get("truncated")}
 
     def choose(self, ctx, call):
         """Second counted call: preview -> chosen or revised action (raw dict)."""

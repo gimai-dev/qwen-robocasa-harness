@@ -91,6 +91,21 @@ class Episode:
         receipt = execute(self.sim, action, slot_steps=self.method.slot_steps(action))
         return receipt
 
+    def load_history(self, source: Path, decision: int) -> None:
+        """Carry the source run's last action/receipt and pre-action images into the continuation."""
+        rows = [json.loads(l) for l in (source / "decisions.jsonl").read_text().splitlines() if l.strip()]
+        last = next((r for r in reversed(rows) if r.get("decision") == decision and "slot" not in r), None)
+        if last is None:
+            return
+        self.previous = {"action": last.get("action"), "result": last.get("receipt") or {"status": last.get("status")}}
+        frames = sorted((source / "sim" / "frames").glob("*"))
+        seq = max(0, min(len(frames) - 1, last.get("steps", 0) and len(frames) - 2))
+        try:
+            self.previous_images = {label: (frames[seq] / f"{label}.png").read_bytes() for label in ("left", "right", "wrist")}
+        except Exception:
+            self.previous_images = None
+        (self.run / "history-source.json").write_text(json.dumps({"source": str(source), "decision": decision, "previous": self.previous}, indent=1))
+
     # ---- short mode ----
     def run_short(self) -> None:
         interface = self.args.interface
@@ -180,7 +195,7 @@ class Episode:
     # ---- full mode ----
     def run_full(self) -> None:
         interface = self.args.interface
-        schema = full_response_schema(interface=interface)
+        schema = self.method.full_schema(interface) if hasattr(self.method, "full_schema") else full_response_schema(interface=interface)
         observation, regions, images = self.observe(1)
         ctx = {"decision": 1, "observation": observation, "regions": regions, "images": images, "previous_images": None,
                "previous": None, "sim": self.sim, "client": self.client, "system_prompt": self.system_prompt}
@@ -235,6 +250,8 @@ class Episode:
                                  action_budget=self.args.steps_budget, wall_budget_s=self.args.wall_budget_s,
                                  restore_from=Path(self.args.restore_from) if self.args.restore_from else None)
             self.sim.launch()
+            if self.args.history_from and self.args.history_decision:
+                self.load_history(Path(self.args.history_from), int(self.args.history_decision))
             self.started = time.monotonic()
             if self.args.mode == "short":
                 self.run_short()
@@ -298,6 +315,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--wall-budget-s", type=float, default=1200.0)
     parser.add_argument("--max-decisions", type=int, default=180)
     parser.add_argument("--restore-from", default=None, help="H8: simulator snapshot to continue from")
+    parser.add_argument("--history-from", default=None, help="H8: source run directory whose decision history precedes the snapshot")
+    parser.add_argument("--history-decision", type=int, default=None, help="H8: last decision index of the source run before the snapshot")
     args = parser.parse_args(argv)
     result = Episode(args).run_episode()
     print(json.dumps({k: result[k] for k in ("task", "seed", "interface", "mode", "method", "official_success", "termination",

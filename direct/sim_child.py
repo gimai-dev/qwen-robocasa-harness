@@ -425,6 +425,7 @@ class Child:
         if receipt is not None:
             record["execution"] = dict(receipt)
         _atomic_json(self.run / "mailbox" / f"observation-{sequence:06d}.json", record)
+        self.snapshot(environment, self.run / "snapshots" / f"{sequence:06d}.json")
         return record
 
     def snapshot(self, environment: object, path: Path) -> dict[str, object]:
@@ -434,6 +435,25 @@ class Child:
                    "total_steps": self.total_steps, "ep_meta": env.get_ep_meta()}
         _atomic_json(path, payload)
         return {"kind": "snapshot", "accepted": True, "path": str(path), "total_steps": self.total_steps}
+
+    def inspect(self, environment: object, path: Path) -> dict[str, object]:
+        """Evaluator-side view of a snapshot: object pose, gripper-object distance, official success."""
+        import numpy as np
+        self.restore(environment, path)
+        env = environment.unwrapped
+        out: dict[str, object] = {"kind": "inspect", "accepted": True, "path": str(path)}
+        try:
+            obj_id = env.obj_body_id["obj"]
+            obj = np.asarray(env.sim.data.body_xpos[obj_id])
+            site = np.asarray(env.sim.data.site_xpos[env.robots[0].eef_site_id["right"]])
+            out.update({"obj_world_m": obj.tolist(), "gripper_obj_distance_m": float(np.linalg.norm(site - obj)),
+                        "obj_velocity_norm": float(np.linalg.norm(env.sim.data.cfrc_ext[obj_id])) if False else None,
+                        "gripper_touching_obj": bool(env.check_contact(env.robots[0].gripper["right"], env.objects["obj"])),
+                        "official_success": bool(env._check_success()),
+                        "base_world_m": np.asarray(env.sim.data.body_xpos[env.sim.model.body_name2id("base0_base")]).tolist() if "base0_base" in env.sim.model.body_names else None})
+        except Exception as error:  # task without a single target object
+            out["error"] = repr(error)
+        return out
 
     def restore(self, environment: object, path: Path) -> None:
         import numpy as np
@@ -470,7 +490,7 @@ def run(task: str, seed: int, run: Path, scenes: Path, *, action_budget: int, wa
     if not 1 <= action_budget <= MAX_ACTION_BUDGET:
         raise ValueError("action budget is invalid")
     run.mkdir(parents=True, exist_ok=False, mode=0o700)
-    for name in ("mailbox", "frames", "video-frames"):
+    for name in ("mailbox", "frames", "video-frames", "snapshots"):
         (run / name).mkdir(mode=0o700)
     episode_tmp = run / "episode-tmp"
     episode_tmp.mkdir(mode=0o700)
@@ -515,6 +535,9 @@ def run(task: str, seed: int, run: Path, scenes: Path, *, action_budget: int, wa
                 raw, receipt = child.execute_base(environment, command, chassis, raw)
             elif kind == "snapshot":
                 receipt = child.snapshot(environment, Path(command["path"]))
+            elif kind == "inspect":
+                receipt = child.inspect(environment, Path(command["path"]))
+                raw = environment.unwrapped.get_observation(environment.unwrapped._get_observations(force_update=True))
             else:
                 raise RuntimeError(f"invalid mailbox command kind {kind!r}")
             child.trace.append({"sequence": sequence, "kind": kind, "steps": receipt.get("steps_executed", 0)})

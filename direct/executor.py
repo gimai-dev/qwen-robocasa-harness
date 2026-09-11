@@ -131,7 +131,7 @@ class Simulator:
 
     def send(self, command: Mapping[str, object], *, timeout_s: float = 300) -> dict:
         payload = {"schema": COMMAND_SCHEMA, "sequence": self.sequence, **command}
-        if command["kind"] in ("slot", "base", "snapshot"):
+        if command["kind"] in ("slot", "base", "snapshot", "inspect"):
             payload["observation_id"] = self.observation["observation_id"]
         _atomic_json(self.sim / "mailbox" / f"command-{self.sequence:06d}.json", payload)
         if command["kind"] in ("finish", "close"):
