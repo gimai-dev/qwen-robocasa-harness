@@ -310,3 +310,39 @@ Setup (RUNBOOK "Lane A"): Show-Harness at 137d571, ManiSkill 3.0.1, stock `PickC
 The one success in each batch is the same seed (8): the cube happened to sit under the open gripper, and MV_DOWN then GRASP finished the task in 2 steps. In every other episode the model answers GRASP on almost every step, the empty gripper is reopened by auto-release, and it grasps again; it never emits RELEASE, MV_FWD or MV_BACK. The scene is trivially legible (a red cube centred on a wooden table, visible in both views). On the same interface the paper reports 86-96% for Gemini 3.1 Pro / GPT-5.6 / Opus 5 and 86% for a 2B Qwen fine-tuned on a few GPU-hours of demonstrations. The zero-shot 27B model does not use the interface at all: it does not steer with the wrist view before grasping.
 
 Caveats: their ManiSkill runner carries only the `auto_release` plugin (subtask planning, recovery, multi-view guidance live in the real-robot/RoboLab runners); PickCube is not their headline BlockPAP rig; 30 episodes per condition.
+
+### Lane B: their interface inside our RoboCasa loop (development screen, 36 episodes)
+
+Setup (RUNBOOK "Lane B"): token vocabulary + deterministic interpreter (2 cm / 4 cm base-frame steps, 15 deg rotations, gripper, base), one guided-choice token per decision, RGB only (agent view + wrist), proprioception text, recent moves, ready pose before decision 1; the same nine development starts and budgets as the numerical campaign. Matrix `/home/jli/state/qwen-direct/matrix/sem-dev`; tables in `results-direct/sem/`.
+
+| Method | Success | Token use (9 episodes) |
+|---|---|---|
+| `sem` (base interface) | 0/9 | MV_DOWN 608, MV_LEFT 179, MV_UP 164, GRASP 44, ROTATE 23, RELEASE 15 |
+| `sem+plan` (+ subtask planner with completion checks) | 0/9 | MV_DOWN 439, MV_LEFT 381, MV_RIGHT 242, MV_FWD 82, GRASP 5 |
+| `sem+plan+rec` (+ empty-close recovery) | 0/9 | as above; 4 recoveries fired |
+| `sem-full` (+ agent-view selection) | 0/9 | as above; 3 recoveries |
+
+Local-progress milestones (evaluator-side), with the numerical clean from Phase C on the same nine starts as reference:
+
+| method | n | approach<=0.10m | contact | hold | lift>=3cm | displaced>=10cm | success | median closest dist m |
+|---|---|---|---|---|---|---|---|---|
+| sem | 9 | 4 | 2 | 1 | 0 | 1 | 0 | 0.116 |
+| sem+plan | 9 | 4 | 3 | 1 | 0 | 2 | 0 | 0.183 |
+| sem+plan+rec | 9 | 4 | 3 | 2 | 2 | 2 | 0 | 0.173 |
+| sem-full | 9 | 4 | 4 | 0 | 0 | 0 | 0 | 0.198 |
+
+
+| numerical clean (Phase C, same starts) | 9 | 0 | 0 | 0 | 0 | 0 | 0 | 0.647 |
+
+Reading: unlike on ManiSkill, the 27B model uses this interface in our loop: varied moves, few GRASP tokens, median closest approach 0.12-0.20 m against 0.65 m for the numerical clean on the same starts, 4 of 9 approaches within 10 cm for every variant (numerical clean 0 of 9), and `sem+plan+rec` held and lifted the object twice. No variant completed a task, and the plan's bar for advancing (3 of 9 holds or a success) was not met; because the interface effect on approach is the largest local-progress effect measured in the campaign and a test-set run costs under an hour, `sem` and `sem+plan+rec` were nevertheless run on the 60 frozen test starts for a paired milestone comparison with Phase E clean and H2 (results below).
+
+#### Costs (means per episode)
+
+| method | interface | mode | n | sim steps | decisions | rejected | Qwen calls | prompt tok | completion tok | Qwen s | SAM s | wall s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| sem | semantic | short | 9 | 806 | 116.4 | 7.0 | 116.4 | 80789 | 353 | 26 | 0 | 80 |
+| sem+plan | semantic | short | 9 | 819 | 134.7 | 13.8 | 135.7 | 99069 | 3382 | 99 | 0 | 158 |
+| sem+plan+rec | semantic | short | 9 | 806 | 132.0 | 13.0 | 132.6 | 96483 | 3302 | 97 | 0 | 155 |
+| sem-full | semantic | short | 9 | 809 | 137.2 | 15.1 | 137.9 | 101038 | 3444 | 84 | 0 | 142 |
+
+
