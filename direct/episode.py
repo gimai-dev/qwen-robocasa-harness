@@ -94,7 +94,7 @@ class Episode:
     # ---- short mode ----
     def run_short(self) -> None:
         interface = self.args.interface
-        schema = short_response_schema(interface=interface)
+        schema = self.method.short_schema(interface) if hasattr(self.method, "short_schema") else short_response_schema(interface=interface)
         decision = 0
         while True:
             if decision >= self.args.max_decisions:
@@ -128,7 +128,19 @@ class Episode:
                     self.termination = "no_progress"; break
                 continue
             record["reasoning"] = call["parsed"].get("reasoning")
-            raw_action = call["parsed"].get("action")
+            ctx["call"] = call
+            if hasattr(self.method, "choose"):
+                try:
+                    raw_action = self.method.choose(ctx, call)
+                except MalformedOutput as error:
+                    record.update({"status": "malformed_output", "error": str(error), "stage": "preview_select"})
+                    self.log_decision(record)
+                    self.no_motion_streak += 1
+                    if self.no_motion_streak >= MAX_CONSECUTIVE_NO_MOTION:
+                        self.termination = "no_progress"; break
+                    continue
+            else:
+                raw_action = call["parsed"].get("action")
             state = observation["public_state"]
             try:
                 action = decode_action(raw_action, interface=interface, representation=self.method.representation,
@@ -142,8 +154,6 @@ class Episode:
                 if self.no_motion_streak >= MAX_CONSECUTIVE_NO_MOTION:
                     self.termination = "no_progress"; break
                 continue
-            # optional method hook: propose-and-preview style revision (H3/H8) may replace the action
-            action = self.method.revise(ctx, call, action) if hasattr(self.method, "revise") else action
             record["action"] = action.summary()
             if action.kind == "stop":
                 record["status"] = "stop"

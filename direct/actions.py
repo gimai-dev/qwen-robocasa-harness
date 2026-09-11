@@ -70,7 +70,7 @@ def _finite_list(value: object, width: int, label: str) -> list[float]:
     return out
 
 
-def action_schema(*, interface: str, allow_stop: bool = True) -> dict:
+def action_schema(*, interface: str, allow_stop: bool = True, extra: Mapping[str, object] | None = None) -> dict:
     """Strict JSON schema for one action; ``interface`` is "ee" or "joint"."""
     if interface not in ("ee", "joint"):
         raise ValueError("interface must be ee or joint")
@@ -89,14 +89,18 @@ def action_schema(*, interface: str, allow_stop: bool = True) -> dict:
         "v": {"anyOf": [number, {"type": "null"}]},
         "n": {"type": "string"},
     })
+    if extra:
+        properties.update(extra)
     return {"type": "object", "additionalProperties": False, "properties": properties,
             "required": list(properties)}
 
 
-def short_response_schema(*, interface: str) -> dict:
-    return {"type": "object", "additionalProperties": False,
-            "properties": {"reasoning": {"type": "string"}, "action": action_schema(interface=interface)},
-            "required": ["reasoning", "action"]}
+def short_response_schema(*, interface: str, action_extra: Mapping[str, object] | None = None,
+                          top_extra: Mapping[str, object] | None = None) -> dict:
+    properties = {"reasoning": {"type": "string"}, "action": action_schema(interface=interface, extra=action_extra)}
+    if top_extra:
+        properties.update(top_extra)
+    return {"type": "object", "additionalProperties": False, "properties": properties, "required": list(properties)}
 
 
 def full_response_schema(*, interface: str, max_slots: int = MAX_FULL_SLOTS) -> dict:

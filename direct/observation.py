@@ -18,7 +18,7 @@ def _r(value: object, digits: int = 3) -> object:
 
 def state_summary(observation: Mapping[str, object]) -> dict:
     s = observation["public_state"]
-    force = s["wrench"]["force_n"]
+    force = s.get("contact_force_delta_n", s["wrench"]["force_n"])
     return _r({
         "tcp_world_m": s["tcp_world_position_m"],
         "tcp_quat_xyzw": s["tcp_world_quat_xyzw"],

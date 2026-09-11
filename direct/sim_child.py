@@ -268,6 +268,7 @@ class Child:
         self.video_index = 0
         self.decision = 0
         self.trace: list[dict[str, object]] = []
+        self.force_baseline: list[float] | None = None
 
     # -- stepping --
     def step(self, environment: object, joint_position: Sequence[float], gripper_open: float,
@@ -329,7 +330,7 @@ class Child:
             public_raw = raw
             executed += 1
             commanded = waypoint
-            force = float(np.linalg.norm(_wrench(environment)["force_n"]))
+            force = float(np.linalg.norm(np.asarray(_wrench(environment)["force_n"]) - np.asarray(self.force_baseline or [0.0, 0.0, 0.0])))
             peak_force = max(peak_force, force)
             q_now = _arm_qpos(environment)
             trace.append({"commanded_q": [round(v, 4) for v in waypoint], "actual_q": [round(v, 4) for v in q_now],
@@ -399,6 +400,10 @@ class Child:
     def publish(self, raw: Mapping[str, object], environment: object, sequence: int,
                 receipt: Mapping[str, object] | None) -> dict[str, object]:
         state = _public_state(raw, environment)
+        if self.force_baseline is None:
+            self.force_baseline = list(state["wrench"]["force_n"])
+        state["contact_force_delta_n"] = [a - b for a, b in zip(state["wrench"]["force_n"], self.force_baseline, strict=True)]
+        state["force_baseline_n"] = self.force_baseline
         calibration = state.pop("camera_calibration")
         images = _save_images(raw, self.run / "frames" / f"{sequence:06d}")
         instruction = raw.get("annotation.human.task_description")

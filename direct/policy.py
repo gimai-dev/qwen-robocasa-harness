@@ -25,6 +25,10 @@ MAX_TOKENS_SHORT = 1024
 MAX_TOKENS_FULL = 4096
 
 
+class InfrastructureError(RuntimeError):
+    """The model service failed (HTTP error); not a model-output failure."""
+
+
 class MalformedOutput(RuntimeError):
     def __init__(self, message: str, record: dict) -> None:
         super().__init__(message)
@@ -85,7 +89,7 @@ class QwenDirectClient:
         if response.is_error:
             record.update({"error": response.text.replace(self._token, "[REDACTED]")[:2000]})
             self._log(record)
-            raise MalformedOutput(f"Qwen HTTP {response.status_code}", record)
+            raise InfrastructureError(f"Qwen HTTP {response.status_code}: {record['error'][:300]}")
         body = response.json()
         choice = body["choices"][0]
         raw = choice["message"]["content"] or ""
