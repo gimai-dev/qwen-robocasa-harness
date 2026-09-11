@@ -79,7 +79,55 @@ Interface changes after Phase B, applied uniformly to every Phase C condition in
 - H6 (failure experience): run with the bank built from the nine Phase C clean EE-short runs (`/home/jli/state/qwen-direct/banks/phaseC/h6-failures.json`); records are unreachable targets, blocked base motions and empty closes with a correction marked verified only when a later action fixed the same failure type.
 - H8 recovery-state evaluation: pending selection of recoverable failure states from the evaluator-side inspection of the Phase C clean runs.
 
-(results pending)
+### EE-short screen (72 episodes, done 2026-09-11)
+
+Code frozen at commit 067e5fb; matrix `/home/jli/state/qwen-direct/matrix/phaseC-ee-short`; tables in `results-direct/phaseC/`. Same nine development starts for every condition (3 tasks x seeds 0-2), clean rerun on the same code as its control.
+
+| Condition | Success / attempts | Paired diff vs clean (n=9) |
+|---|---|---|
+| clean | 0/9 | - |
+| H1 visual markers | 0/9 | 0, interval [0, 0] |
+| H2 relative actions | 0/9 | 0 |
+| H3 propose and preview | 0/9 | 0 |
+| H4 execution timing (5/10/20) | 0/9 | 0 |
+| H4c fixed 5-step control | 0/9 | 0 |
+| H5 working memory | 0/9 | 0 |
+| H8 explicit recovery | 0/9 | 0 |
+| H6 failure experience | running | |
+| H7 successful skills | not run (prerequisite missing, see above) | |
+
+Complete-task success does not separate any condition from clean at this scale: every paired difference is exactly zero. Local progress, measured evaluator-side from the simulator snapshots the policy never sees, does separate them:
+
+| method | n | approach<=0.10m | contact | hold | lift>=3cm | displaced>=10cm | success | median closest dist m |
+|---|---|---|---|---|---|---|---|---|
+| clean | 9 | 0 | 0 | 0 | 0 | 0 | 0 | 0.647 |
+| h1 | 9 | 2 | 2 | 0 | 0 | 1 | 0 | 0.410 |
+| h2 | 9 | 2 | 2 | 0 | 0 | 1 | 0 | 0.335 |
+| h3 | 9 | 1 | 2 | 1 | 0 | 1 | 0 | 0.620 |
+| h4 | 9 | 1 | 1 | 1 | 1 | 1 | 0 | 0.611 |
+| h4c | 9 | 0 | 0 | 0 | 0 | 0 | 0 | 0.656 |
+| h5 | 9 | 0 | 0 | 0 | 0 | 0 | 0 | 0.649 |
+| h8 | 9 | 1 | 0 | 0 | 0 | 0 | 0 | 0.659 |
+
+
+Reading: clean never brought the gripper within 10 cm of the target object in any of its nine runs (median closest approach 0.65 m); H1 and H2 reached and touched the object in two runs each, H3 and H4 achieved a held grasp once each, and H4 (CounterToSink seed 0) lifted the orange 17.5 cm, carried it into the sink and released it, then stopped without withdrawing 0.25 m, failing the official predicate. H4c, H5 and H8 show no local progress. With n=9 and counts of 0-2, none of this is statistically separable; it identifies H1, H2, H3, H4 as the candidates with a mechanism worth validating and H4c, H5, H8 as unsupported.
+
+Note on Phase B vs Phase C clean: the Phase B clean run that succeeded (CounterToSink seed 0) did not repeat under the Phase C code; the Phase C clean runs also approached objects less often than Phase B's traces suggest. The interface changes between the phases (norm-growth force, minimum-reach text, contact-blocking note, SAM 16-point grid) changed the deterministic trajectories; whether they helped or hurt clean is not resolved by these data, but every Phase C comparison is internally consistent.
+
+#### Costs (means per episode)
+
+| method | interface | mode | n | sim steps | decisions | rejected | Qwen calls | prompt tok | completion tok | Qwen s | SAM s | wall s |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| clean | ee | short | 9 | 893 | 75.4 | 30.4 | 75.4 | 294102 | 11201 | 270 | 261 | 594 |
+| h1 | ee | short | 9 | 893 | 71.1 | 26.1 | 71.1 | 301040 | 10343 | 251 | 229 | 549 |
+| h2 | ee | short | 9 | 804 | 65.0 | 24.3 | 65.0 | 260623 | 9661 | 232 | 237 | 530 |
+| h3 | ee | short | 9 | 898 | 45.4 | 0.4 | 90.9 | 291855 | 19764 | 418 | 199 | 689 |
+| h4 | ee | short | 9 | 799 | 67.3 | 26.4 | 67.3 | 271245 | 10091 | 243 | 240 | 538 |
+| h4c | ee | short | 9 | 501 | 137.1 | 51.3 | 137.1 | 551001 | 19762 | 474 | 497 | 1018 |
+| h5 | ee | short | 9 | 889 | 56.1 | 11.2 | 56.1 | 235024 | 21385 | 442 | 240 | 743 |
+| h8 | ee | short | 9 | 818 | 64.2 | 22.9 | 64.2 | 264421 | 14223 | 315 | 256 | 627 |
+
+
 
 ## 5. Costs
 
