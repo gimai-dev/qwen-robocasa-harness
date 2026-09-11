@@ -360,6 +360,9 @@ class Child:
 
     def execute_base(self, environment: object, command: Mapping[str, object], chassis: ChassisHold,
                      public_raw: Mapping[str, object]) -> tuple[Mapping[str, object], dict[str, object]]:
+        import numpy as np
+        from .chassis_hold import public_chassis_pose
+        chassis_yaw = lambda state: public_chassis_pose(state)[2]
         axis = command["a"]
         velocity = float(command["v"])
         if axis not in ("x", "y", "yaw") or not 0.0 < abs(velocity) <= BASE_VELOCITY_LIMIT:
@@ -375,18 +378,20 @@ class Child:
         base[("x", "y", "yaw").index(axis)] = velocity
         executed = 0
         raw = public_raw
+        trace = []
         for index in range(steps):
             if not self.budget_left():
                 break
             raw = self.step(environment, hold_q, gripper_open, base if index < motion_steps else [0.0, 0.0, 0.0])
             executed += 1
+            trace.append([round(float(v), 4) for v in np.asarray(raw["state.base_position"]).reshape(-1)] + [round(chassis_yaw(raw), 4)])
         self.gripper_open = gripper_open
         chassis.reset_after_base_action(raw)
         after = _public_state(raw, environment)
         receipt = {
             "kind": "base", "accepted": True, "axis": axis, "velocity": velocity,
             "steps_requested": steps, "steps_executed": executed, "motion_steps": motion_steps,
-            "budget_truncated": executed < steps, "gripper_command": gripper_open,
+            "budget_truncated": executed < steps, "gripper_command": gripper_open, "trace": trace,
             "arm_q_before": hold_q, "arm_q_after": after["arm_q_rad"],
             "final_joint_error_rad": max(abs(a - b) for a, b in zip(after["arm_q_rad"], hold_q, strict=True)),
             "base_world_before_m": before["base_world_position_m"], "base_world_after_m": after["base_world_position_m"],

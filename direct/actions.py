@@ -24,7 +24,7 @@ from .kinematics import JOINT_LIMITS, JOINT_LIMIT_MARGIN, quat_xyzw_to_matrix
 SLOT_STEPS = 20
 MAX_FULL_SLOTS = 45
 BASE_VELOCITY_LIMIT = 0.5
-BASE_MOTION_STEPS = 10          # base velocity is applied for these steps, then braked
+BASE_MOTION_STEPS = 16          # base velocity is applied for these steps, then braked for the rest of the slot
 KINDS = ("ee", "joint", "base", "hold", "stop")
 AXES = ("x", "y", "yaw")
 

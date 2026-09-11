@@ -42,6 +42,12 @@ class Receipt:
                     "peak_force_n", "tcp_world_after_m", "tcp_world_quat_after_xyzw", "gripper_width_after_m",
                     "base_world_after_m", "base_yaw_after_rad", "budget_truncated", "tracking_pauses")
             out.update({k: _round(c[k]) for k in keep if k in c})
+            if "tcp_world_after_m" in c and "tcp_world_before_m" in c:
+                out["tcp_moved_m"] = [round(a - b, 4) for a, b in zip(c["tcp_world_after_m"], c["tcp_world_before_m"])]
+            if "base_world_after_m" in c and "base_world_before_m" in c:
+                out["base_moved_m"] = [round(a - b, 4) for a, b in zip(c["base_world_after_m"], c["base_world_before_m"])]
+                if self.action is not None and self.action.kind == "base" and max(abs(v) for v in out["base_moved_m"][:2]) < 0.01 and self.action.axis != "yaw":
+                    out["note"] = "the base barely moved: it is probably blocked by furniture in that direction"
         return out
 
 
@@ -202,6 +208,8 @@ def execute(sim: Simulator, action: Action, *, slot_steps: int = SLOT_STEPS,
                     "direct_ik": {"status": direct["status"], "residual_position_m": round(direct["position_error_m"], 4),
                                   "max_joint_delta_rad": round(direct["max_joint_delta_rad"], 3)},
                     "target_base_m": [round(float(v), 4) for v in p_base],
+                    "target_distance_from_shoulder_m": round(float(np.linalg.norm(np.asarray(p_base) - np.array([0.0, 0.0, 0.333]))), 3),
+                    "target_horizontal_distance_from_base_m": round(float(np.linalg.norm(np.asarray(p_base)[:2])), 3),
                     "segment_length_m": round(plan["segment_length_m"], 4)})
         command = {"kind": "slot", "waypoints": plan["waypoints"], "g": gripper, "steps": slot_steps}
         detail = {"ik_waypoints": len(plan["waypoints"]), "segment_length_m": round(plan["segment_length_m"], 4),
