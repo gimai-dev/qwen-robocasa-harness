@@ -138,6 +138,8 @@ Note on Phase B vs Phase C clean: the Phase B clean run that succeeded (CounterT
 | EE-full | clean | 0/9 | one-shot plans of 1 to 10 actions (143-724 completion tokens); 3 ended at an unreachable slot, 6 completed their short plan |
 | EE-full | H3 candidates + preview | 0/9 | 2 counted calls per episode; chosen plans of 1-2 actions (mean 18 steps); one call hit the 4,096-token limit (`truncated_output`, no motion executed) |
 
+Joint-short milestones (evaluator-side, `results-direct/phaseC/phaseC-joint-short-milestones.md`): clean 0/9 approaches within 10 cm (median closest 0.50 m); H2 delta-q 2/9 approaches, 2 contacts, no hold (median closest 0.20 m). The relative representation helps the model get near the object in both interfaces but does not produce a grasp.
+
 The 4,096-token bound is not what limits full mode: the longest clean plan (10 actions) used 724 tokens. Qwen writes short one-shot plans and stops.
 
 ## 5. Costs
