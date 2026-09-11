@@ -133,3 +133,40 @@ Interface checks, run `smoke-7` on CounterToSink seed 0 ("Pick the orange from t
 | finish | official predicate | evaluated, `finished_false`, terminal outcome sealed |
 
 Timings: child launch about 20 s; one 20-step slot about 1.1 s; SAM server start about 6 s; SAM three views about 0.5 s.
+
+
+## Show-Harness-style semantic family (2026-09-12)
+
+Plan: `docs/superpowers/plans/2026-09-11-show-harness-style-qwen27b.md`.
+
+### Lane B: their interface in our loop (`direct/semantic*.py`)
+
+```bash
+$PY -m direct.semantic_episode --task PickPlaceCounterToSink --seed 0 --method sem-full --out /home/jli/state/qwen-direct/runs/<name>
+$PY -m direct.matrix --tasks <3 tasks> --seeds 0 1 2 --interfaces ee --modes short --methods sem sem+plan sem+plan+rec sem-full --out /home/jli/state/qwen-direct/matrix/sem-dev --parallel 3
+```
+
+| Item | Value |
+|---|---|
+| Vocabulary | MV_FWD/BACK/LEFT/RIGHT/UP/DOWN, ROTATE_CW/CCW, GRASP, RELEASE, DONE, BASE_FWD/BACK/LEFT/RIGHT (base tokens are our mobile-base extension) |
+| Interpreter | moves are fixed steps in the robot base frame (+x forward, +y left, +z up) rotated by the measured base yaw: 0.02 m fine / 0.04 m coarse; ROTATE 15 deg about the tool axis; GRASP/RELEASE = hold slot with gripper 0/1; BASE_* = one base slot at |v| = 0.5 |
+| Slots | moves 6 sim steps (`MOVE_SLOT_STEPS`), gripper and base 20 |
+| Policy call | one token per decision via vLLM `guided_choice`; with the planner, a strict JSON `{subtask_done, token}` instead |
+| Images | Image A = agent view (left camera; `sem-full` switches to right when the TCP leaves the left view), Image B = wrist. No SAM regions |
+| Text | task, current subtask + done_when, proprioception (gripper height, gripper state, contact force, last action effect), last 8 moves |
+| Methods | `sem`: base interface (fine step below 1.15 m TCP height); `sem+plan`: + one planning call (3-6 subtasks with completion criteria, phase approach/align sets fine/coarse); `sem+plan+rec`: + empty-close -> forced RELEASE + rollback to the grasp subtask; `sem-full`: + agent-view selection |
+| Ready pose | `READY_Q = (0, -0.35, 0, -2.0, 0, 1.65, 0.785)` reached in up to 3 slots before decision 1 (logged as decision 0); TCP 0.45 m ahead, 0.51 m above the base, tool pointing down |
+| Budgets | as the numerical family: 900 steps, 1200 s, 180 decisions |
+
+### Lane A: Show-Harness itself on ManiSkill with our Qwen
+
+Checkout `/home/jli/work/show-harness` (showlab/Show-Harness at 137d571), venv `.venv` (uv, Python 3.11, mani_skill 3.0.1). Vulkan: `libnvidia-gl-580=580.173.02-1ubuntu1` installed with `dpkg -i` (left "unconfigured" by dpkg but the ICD and libraries work); always `export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nvidia_icd.json`.
+
+BlockPAP-v1 (their default, RLinf real2sim rig) is NOT available: RLinf's public repo does not ship `real_franka.real2sim_env`. Lane A therefore uses the stock `PickCube-v1` with `panda_wristcam` (the docs list it as supported "with a much larger domain gap").
+
+Config `configs/robot_maniskill_qwen27b.yaml` (copy of `robot_maniskill.yaml`: env PickCube-v1, agentview base_camera, camera_resolution 256, vlm base_url 127.0.0.1:8002, backend `qwen27b` = provider vllm, model = our served id, max_tokens 24, thinking off; api_key is our token, file mode 600). Runner `scripts/run_maniskill_qwen27b.py` = stock `run_maniskill_mvtoken.py` with the controller switched from the fine-tuned bare-token call to their zero-shot `complete_token` (guided_choice + strict retry). Plugins in this runner: `auto_release` only (their ManiSkill path has no subgoal/recovery plugins; those live in the real-robot/RoboLab runners).
+
+```bash
+cd /home/jli/work/show-harness && export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nvidia_icd.json
+.venv/bin/python -u scripts/run_maniskill_qwen27b.py --robot-config configs/robot_maniskill_qwen27b.yaml --version v3 --episode-index 0 --max-steps 60
+```
