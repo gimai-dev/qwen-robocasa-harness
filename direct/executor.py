@@ -234,7 +234,11 @@ def execute(sim: Simulator, action: Action, *, slot_steps: int = SLOT_STEPS,
     elif action.kind == "ee" or action.kind == "joint":
         status = "completed" if child["final_joint_error_rad"] < 0.03 else "partial"
         if status == "partial":
-            detail["reason"] = "slot ended before the target was reached; the robot is at tcp_world_after_m"
+            if child.get("waypoints_commanded") == child.get("waypoints_total") and child.get("peak_force_n", 0) > 15:
+                detail["reason"] = (f"motion blocked by contact: the arm pressed on something and stalled short of the target "
+                                    f"(peak contact force {child['peak_force_n']:.0f} N); the robot is at tcp_world_after_m; move away from the obstacle before retrying")
+            else:
+                detail["reason"] = "slot ended before the target was reached (the path was longer than one slot); the robot is at tcp_world_after_m"
     else:
         status = "completed"
     return Receipt(status, action, steps, detail, child)
