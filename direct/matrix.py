@@ -22,9 +22,10 @@ def run_one(spec: dict, out: Path) -> dict:
     run = out / name
     if (run / "result.json").exists():
         return json.loads((run / "result.json").read_text())
-    command = [PYTHON, "-m", "direct.episode", "--task", spec["task"], "--seed", str(spec["seed"]),
-               "--interface", spec["interface"], "--mode", spec["mode"], "--method", spec["method"],
-               "--method-config", json.dumps(spec.get("method_config", {})), "--out", str(run)]
+    module = "direct.semantic_episode" if spec["method"].startswith("sem") else "direct.episode"
+    command = [PYTHON, "-m", module, "--task", spec["task"], "--seed", str(spec["seed"]), "--method", spec["method"], "--out", str(run)]
+    if module == "direct.episode":
+        command += ["--interface", spec["interface"], "--mode", spec["mode"], "--method-config", json.dumps(spec.get("method_config", {}))]
     for key in ("steps_budget", "wall_budget_s", "max_decisions"):
         if key in spec:
             command += [f"--{key.replace('_', '-')}", str(spec[key])]
