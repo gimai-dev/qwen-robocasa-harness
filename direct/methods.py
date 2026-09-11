@@ -52,5 +52,8 @@ class Method:
 def make_method(name: str, *, run: Path, config: Mapping[str, object]) -> Method:
     if name == "clean":
         return Method(run=run, config=config)
+    if "+" in name:
+        from .combos import make_combo
+        return make_combo(name, run=run, config=config)
     from . import harnesses
     return harnesses.make(name, run=run, config=config)
