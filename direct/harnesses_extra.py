@@ -415,8 +415,9 @@ class H7SuccessfulSkills(BankMethod):
 
     def prompt_suffix(self) -> str:
         return ("SUCCESSFUL SKILLS (this condition): `successful_skills` lists interaction fragments that worked in earlier clean runs, "
-                "with their applicability conditions, the relative geometry between TCP and object (world-frame offsets), and the "
-                "gripper timing. They are references, not commands: generate fresh numerical targets from the current observation.")
+                "with their applicability conditions, source-scene absolute world poses, and gripper timing. These source coordinates "
+                "are examples from a different observation; local grasp-and-lift success is distinct from complete_task_success. "
+                "Use the timing and interaction pattern as context and generate fresh numerical targets from the current observation.")
 
     def observe(self, ctx):
         return {"successful_skills": self._retrieve(ctx, 2)}, []
