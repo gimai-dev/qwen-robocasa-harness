@@ -36,6 +36,8 @@ The campaign runner produces27/27/18 unique core runs, routes ready initializati
 
 ## Limits of this evidence
 
+Stage3 subsequently exposed a joint-guide contract mismatch: advertised joint endpoints could be rejected by the decoder. The two joint guides now advertise accepted endpoints and qualify their downward-orientation formula with zero shoulder/forearm roll. The endpoint regression failed18 subcases before the repair and passes all28 afterward. All44 repair tests pass locally and remotely. See `joint-guide-repair.md`. EE prompts and the shared executor are unchanged, so Stage2 remains valid.
+
 The first Stage 2 attempts subsequently exposed a reset-transient force baseline. The focused follow-up replaces it with robot-derived unloaded weight and marks initial sensor feedback unavailable until stepping. All43 repair regressions pass locally and remotely. See `force-repair.md` and `force-probes.json` for the physical measurements and separately retained invalid attempts.
 
 These are execution-contract and evidence-alignment checks. Partial motion does not establish successful approach, grasp, or task completion. Two recorded yaw turns also agree with the repaired H3 preview: base-position errors were 0.05 and 0.34 mm; TCP errors were 0.51 and 0.68 mm. The H3 model is an ideal kinematic prefix with measured free-space base calibration; contacts, tracking pauses, and perception errors remain for the real rollout to reveal.
