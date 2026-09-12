@@ -36,6 +36,8 @@ The campaign runner produces27/27/18 unique core runs, routes ready initializati
 
 ## Limits of this evidence
 
+The first Stage 2 attempts subsequently exposed a reset-transient force baseline. The focused follow-up replaces it with robot-derived unloaded weight and marks initial sensor feedback unavailable until stepping. All43 repair regressions pass locally and remotely. See `force-repair.md` and `force-probes.json` for the physical measurements and separately retained invalid attempts.
+
 These are execution-contract and evidence-alignment checks. Partial motion does not establish successful approach, grasp, or task completion. Two recorded yaw turns also agree with the repaired H3 preview: base-position errors were 0.05 and 0.34 mm; TCP errors were 0.51 and 0.68 mm. The H3 model is an ideal kinematic prefix with measured free-space base calibration; contacts, tracking pauses, and perception errors remain for the real rollout to reveal.
 
 Final follow-up physics passed: restored-heading translation drift fell from0.111m to0.000995m; the restored arm hold remained within1cm per axis. Across signed yaw velocities0.05,0.1,0.15,0.2,0.3,0.4, maximum preview error was0.000124rad. The0.05/0.2 points were interpolation checks, not calibration inputs. Raw follow-up: `h200-4:/home/jli/state/qwen-direct/revision-2026-09/probes/review-after/`. All42 merged repair tests passed locally and remotely.

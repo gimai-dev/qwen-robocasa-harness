@@ -186,6 +186,19 @@ def _wrench(environment: object) -> dict[str, list[float]]:
             "torque_nm": [float(v) for v in robot.ee_torque["right"]]}
 
 
+def _unloaded_wrist_weight(environment: object) -> float:
+    """Gravity load of the robot bodies distal to its wrist force sensor."""
+    env = environment.unwrapped
+    model = env.sim.model
+    sensor = model.sensor_name2id(env.robots[0].gripper["right"].important_sensors["force_ee"])
+    body = model.site_bodyid[model.sensor_objid[sensor]]
+    return float(model.body_subtreemass[body]) * math.sqrt(sum(float(g) ** 2 for g in model.opt.gravity))
+
+
+def _wrist_load(force: Sequence[float], unloaded_weight: float) -> float:
+    return max(0.0, math.sqrt(sum(float(v) ** 2 for v in force)) - unloaded_weight)
+
+
 def _public_state(raw: Mapping[str, object], environment: object) -> dict[str, object]:
     import numpy as np
     from robocasa_inspect.camera_geometry import official_camera_calibration, project_world_point
@@ -268,7 +281,7 @@ class Child:
         self.video_index = 0
         self.decision = 0
         self.trace: list[dict[str, object]] = []
-        self.force_baseline: list[float] | None = None
+        self.unloaded_wrist_weight: float | None = None
 
     # -- stepping --
     def step(self, environment: object, joint_position: Sequence[float], gripper_open: float,
@@ -330,7 +343,7 @@ class Child:
             public_raw = raw
             executed += 1
             commanded = waypoint
-            force = float(np.linalg.norm(_wrench(environment)["force_n"]) - np.linalg.norm(self.force_baseline or [0.0, 0.0, 0.0]))
+            force = _wrist_load(_wrench(environment)["force_n"], self.unloaded_wrist_weight)
             peak_force = max(peak_force, force)
             q_now = _arm_qpos(environment)
             trace.append({"commanded_q": [round(v, 4) for v in waypoint], "actual_q": [round(v, 4) for v in q_now],
@@ -404,13 +417,13 @@ class Child:
     def publish(self, raw: Mapping[str, object], environment: object, sequence: int,
                 receipt: Mapping[str, object] | None) -> dict[str, object]:
         state = _public_state(raw, environment)
-        if self.force_baseline is None:
-            self.force_baseline = list(state["wrench"]["force_n"])
-        # The wrist sensor carries a large bias that rotates with the wrist; the norm
-        # change relative to the free-hanging baseline is the usable contact signal.
-        import math
-        state["contact_force_delta_n"] = round(math.sqrt(sum(v * v for v in state["wrench"]["force_n"])) - math.sqrt(sum(v * v for v in self.force_baseline)), 2)
-        state["force_baseline_n"] = self.force_baseline
+        if self.unloaded_wrist_weight is None:
+            self.unloaded_wrist_weight = _unloaded_wrist_weight(environment)
+        # Reset/restore sensor values can be transient. After physics advances,
+        # compare against robot gravity load, never against that transient.
+        state["contact_force_delta_n"] = (round(_wrist_load(state["wrench"]["force_n"], self.unloaded_wrist_weight), 2)
+                                           if self.total_steps > 0 else None)
+        state["unloaded_wrist_weight_n"] = self.unloaded_wrist_weight
         calibration = state.pop("camera_calibration")
         images = _save_images(raw, self.run / "frames" / f"{sequence:06d}")
         instruction = raw.get("annotation.human.task_description")
