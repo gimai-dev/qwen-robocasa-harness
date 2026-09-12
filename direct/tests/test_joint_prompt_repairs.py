@@ -4,9 +4,22 @@ import re
 import unittest
 
 from direct.actions import decode_action
+from direct.kinematics import JOINT_LIMITS
 
 
 class JointPromptContractTests(unittest.TestCase):
+    def test_reported_error_bounds_are_executable(self):
+        for index,(lower,_) in enumerate(JOINT_LIMITS):
+            q=[0.,0.,0.,-1.5,0.,1.5,0.]
+            q[index]=lower-1
+            with self.assertRaises(ValueError) as error:
+                decode_action({'k':'joint','q':q,'g':1},interface='joint')
+            bounds=re.search(r'safe range \[([^\]]+)\]',str(error.exception)).group(1)
+            for endpoint in map(float,bounds.split(',')):
+                with self.subTest(joint=index+1,endpoint=endpoint):
+                    q[index]=endpoint
+                    decode_action({'k':'joint','q':q,'g':1},interface='joint')
+
     def test_advertised_joint_endpoints_are_executable(self):
         prompts=Path(__file__).resolve().parents[1]/'prompts'
         for mode in ('short','full'):

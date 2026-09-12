@@ -153,8 +153,11 @@ def decode_action(value: Mapping[str, object], *, interface: str, representation
             q = [float(c) + d for c, d in zip(current_q, q, strict=True)]
         for index, (v, (lower, upper)) in enumerate(zip(q, JOINT_LIMITS, strict=True)):
             if not lower + JOINT_LIMIT_MARGIN <= v <= upper - JOINT_LIMIT_MARGIN:
+                # Round inward so the model can execute either displayed bound.
+                reported_lower = math.ceil((lower + JOINT_LIMIT_MARGIN) * 1000) / 1000
+                reported_upper = math.floor((upper - JOINT_LIMIT_MARGIN) * 1000) / 1000
                 raise ValueError(f"joint{index + 1} target {v:.3f} is outside the safe range "
-                                 f"[{lower + JOINT_LIMIT_MARGIN:.3f}, {upper - JOINT_LIMIT_MARGIN:.3f}]")
+                                 f"[{reported_lower:.3f}, {reported_upper:.3f}]")
         return Action("joint", q_rad=tuple(q), gripper=gripper, note=note, raw=raw)
     if kind == "base":
         axis = value.get("a")
