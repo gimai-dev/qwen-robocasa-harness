@@ -346,3 +346,27 @@ Reading: unlike on ManiSkill, the 27B model uses this interface in our loop: var
 | sem-full | semantic | short | 9 | 809 | 137.2 | 15.1 | 137.9 | 101038 | 3444 | 84 | 0 | 142 |
 
 
+
+### Lane B: frozen test set (sem and sem+plan+rec, 60 starts each; done 2026-09-12)
+
+Matrix `/home/jli/state/qwen-direct/matrix/sem-test`; tables `results-direct/sem/sem-test-results.md`, milestones `results-direct/sem/sem-test-milestones.md`. Same 60 starts as Phase E, so the comparison with numerical clean and H2 is paired.
+
+| Condition | Success | approach<=0.10 m | contact | hold | lift | displaced | median closest m | decisions | calls | wall s |
+|---|---|---|---|---|---|---|---|---|---|---|
+| numerical clean (Phase E) | 1/60 | 7 | 5 | 3 | 2 | 2 | 0.662 | 66 | 66 | 517 |
+| numerical H2 relative (Phase E) | 1/60 | 15 | 12 | 5 | 4 | 6 | 0.323 | 65 | 65 | 540 |
+| `sem` (Show-Harness-style tokens) | 0/60 | 14 | 14 | 4 | 1 | 3 | 0.221 | 126 | 126 | 78 |
+| `sem+plan+rec` (+ subtask plan + recovery) | 0/60 | 14 | 10 | 3 | 3 | 6 | 0.260 | 136 | 137 | 135 |
+
+Paired bootstrap differences (n=60, 95% intervals):
+- `sem` vs clean: approach +0.117 [0.000, +0.233], contact +0.150 [+0.033, +0.283]; hold, lift, displaced within noise.
+- `sem+plan+rec` vs clean: approach +0.117 [0.000, +0.233]; contact +0.083 [-0.033, +0.200]; the rest within noise.
+- `sem` vs H2 and `sem+plan+rec` vs H2: every milestone difference is within noise (e.g. approach -0.017 [-0.167, +0.133]); success is 0/60 vs 1/60.
+
+Reading: in our loop the Show-Harness-style interface reproduces exactly what H2 (relative numerical displacements) already gave, the same pre-grasp improvement over absolute coordinates, and nothing beyond it: no gain in holds, lifts or task completion, with or without the subtask planner and empty-close recovery. It is, however, 4-7x cheaper per episode (78-135 s, 0.4-3.4k completion tokens) because each decision is one guided token.
+
+### What the two lanes say together
+
+- Lane A: on Show-Harness's own tabletop benchmark, zero-shot Qwen-27B gets 1/30 with a degenerate GRASP loop, where the paper's frontier models get 86-96% and a 2B Qwen fine-tuned on a few GPU-hours of demonstrations gets 86%. The interface is not what the 27B model is missing; fine-grained spatial grounding is, and it does not appear zero-shot at this scale.
+- Lane B: inside our harder RoboCasa setting the same interface behaves sensibly (no GRASP loop, approaches in 14 of 60 starts) but is indistinguishable from the best numerical variant on every milestone and never completes a task.
+- Conclusion: for this model, changing the action interface (numerical, relative numerical, or discrete semantic tokens) moves only the pre-grasp stage; the grasp-and-transport stages need either a stronger VLM or supervised adaptation (Show-Harness's own route for small Qwen), not another harness.
