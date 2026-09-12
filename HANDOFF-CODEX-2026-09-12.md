@@ -30,7 +30,7 @@ Shared adjustments recorded in REPORT section 1 and 3: vLLM restarted with `--li
 
 ## 3. What was run and what came out
 
-Total: 521 episodes on h200-4 (401 numerical campaign + 120 semantic test + Lane A 60 on ManiSkill), about 70 summed wall hours, about 100M prompt tokens. Raw data: `/home/jli/state/qwen-direct/` (about 30 GB, not backed up), `/home/jli/state/show-harness/`.
+Corrected count (Codex audit): 563 RoboCasa attempt records on h200-4 (403 numerical and 160 semantic, including smoke runs and retained infrastructure failures). The RoboCasa records total 60.3 summed wall hours and 108.5M prompt tokens. Lane A's 60 ManiSkill episodes are reported separately. Source aggregation: `results-direct/revision-2026-09/historical-summary.json`. Raw data: `/home/jli/state/qwen-direct/` and `/home/jli/state/show-harness/`.
 
 | Block | Episodes | Result |
 |---|---|---|
@@ -64,7 +64,7 @@ Per-decision diagnosis over 7,969 Phase E decisions:
 - Execution: 34% of decisions IK-rejected (55% of those in the 0.3-0.6 m band that should be reachable); base blocked by furniture in every start.
 - Lane A shows the same model cannot steer with a wrist camera even on a red cube on an empty table, where Show-Harness reports 86-96% for frontier VLMs and 86% for a demo-fine-tuned 2B Qwen.
 
-Conclusion: every interface (absolute numeric, relative numeric, joint, full trajectory, discrete semantic tokens) and every harness (H1-H8, subtask planning, recovery, previews, memory, banks) moves only the pre-grasp stage. Zero-shot Qwen3.8-27B lacks fine-grained spatial grounding; no harness fixes that.
+Corrected conclusion: the tested configurations did not demonstrate improved complete-task success; H2 improved approach and contact. These experiments do not isolate the limiting model capability or establish that another harness cannot help. The audit found valid IK targets rejected by a slot-length restriction, missing H3 selection context, incorrect recovery history, and unverified skill extraction. H7 was not evaluated. The revised campaign will preserve these historical results and rerun affected comparisons separately.
 
 ## 5. Options that remain (not chosen; Jiachen decides)
 

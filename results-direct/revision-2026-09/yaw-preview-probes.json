@@ -1,0 +1,12 @@
+[
+  {
+    "source_sequence": 7,
+    "base_world_position_m": 5.132992184854865e-05,
+    "tcp_world_position_m": 0.0005064220467432172
+  },
+  {
+    "source_sequence": 12,
+    "base_world_position_m": 0.0003439522254228461,
+    "tcp_world_position_m": 0.0006818269773223873
+  }
+]

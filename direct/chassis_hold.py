@@ -6,7 +6,8 @@ XY_GAIN = 10.0  # 20 Hz: at most half the position error per selected-axis tick.
 YAW_GAIN = 4.0
 XY_DEADBAND_M = .0025
 YAW_DEADBAND_RAD = math.radians(.5)
-NORMALIZED_LIMIT = .25
+NORMALIZED_LIMIT = .5
+TRANSLATION_DEADZONE = .25  # Installed joint frictionloss 250 / actuator gain 1000.
 VELOCITY_SCALES = (1., 1., 1.5)  # Installed Omron velocity-actuator ctrlranges.
 
 
@@ -25,6 +26,27 @@ def _rotate(angle, vector):
 
 def _wrap(angle):
     return math.atan2(math.sin(angle), math.cos(angle))
+
+
+def _friction_feedforward(velocity):
+    return math.copysign(abs(velocity) + TRANSLATION_DEADZONE, velocity) if abs(velocity) > 1e-12 else 0.0
+
+
+def base_velocity_input(axis, velocity, current_yaw, reset_yaw):
+    """Map one public current-heading axis to the installed base controller.
+
+    Its translation joints retain the reset frame, and RoboCasa selects the
+    legacy controller with +delta yaw. Invert it and the measured per-joint
+    friction so a diagonal command retains the requested heading.
+    """
+    if axis == "yaw":
+        return [0., 0., velocity]
+    speed = math.copysign(max(abs(velocity) - TRANSLATION_DEADZONE, 0.), velocity)
+    delta = current_yaw - reset_yaw
+    initial = _rotate(delta, (speed, 0.) if axis == "x" else (0., speed))
+    drive = [_friction_feedforward(v) for v in initial]
+    x, y = _rotate(-delta, drive)
+    return [x, y, 0.]
 
 
 @dataclass
@@ -55,14 +77,18 @@ class ChassisHold:
         if math.hypot(*error) <= XY_DEADBAND_M:
             error = [0.,0.]
         initial_xy = _rotate(-self.reset_yaw_rad, error)
-        # Installed MobileBaseJointVelocityController applies R(-delta_yaw).
-        # Invert that map before choosing its one permitted input axis.
-        input_xy = _rotate(current_yaw-self.reset_yaw_rad, initial_xy)
-        candidate = [XY_GAIN*input_xy[0], XY_GAIN*input_xy[1],
+        # Choose one physical translation joint, then invert the installed
+        # controller's rotation. Its input may need both XY components.
+        candidate = [XY_GAIN*initial_xy[0], XY_GAIN*initial_xy[1],
                      0. if abs(yaw_error)<=YAW_DEADBAND_RAD else YAW_GAIN*yaw_error/VELOCITY_SCALES[2]]
         index = max(range(3), key=lambda i:abs(candidate[i]))
         motion = [0.,0.,0.]
-        motion[index] = max(-NORMALIZED_LIMIT, min(NORMALIZED_LIMIT,candidate[index]))
+        if index == 2:
+            motion[2] = max(-NORMALIZED_LIMIT, min(NORMALIZED_LIMIT, candidate[2]))
+        else:
+            drive = max(-NORMALIZED_LIMIT, min(NORMALIZED_LIMIT, _friction_feedforward(candidate[index])))
+            initial_drive = (drive, 0.) if index == 0 else (0., drive)
+            motion[:2] = _rotate(self.reset_yaw_rad-current_yaw, initial_drive)
         return motion
 
     def receipt(self, state, corrections, *, reset=False):
@@ -97,6 +123,8 @@ def validate_chassis_receipt(value, step_count):
     if len(rows)!=expected:
         raise ValueError('chassis correction count differs from actuation count')
     for row in rows:
-        if len(row)!=3 or any(not math.isfinite(float(v)) or abs(v)>.25+1e-12 for v in row) or sum(abs(v)>1e-12 for v in row)>1:
-            raise ValueError('chassis correction exceeds bounded one-axis actuation')
+        if (len(row)!=3 or any(not math.isfinite(float(v)) for v in row)
+                or math.hypot(*row[:2])>NORMALIZED_LIMIT+1e-12 or abs(row[2])>NORMALIZED_LIMIT+1e-12
+                or (abs(row[2])>1e-12 and math.hypot(*row[:2])>1e-12)):
+            raise ValueError('chassis correction exceeds bounded translation or yaw actuation')
     return value

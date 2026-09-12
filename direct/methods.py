@@ -4,7 +4,7 @@ Every method keeps Qwen as the sole author of numbers. Hooks:
   prompt_suffix()            extra system-prompt text for the condition
   observe(ctx)               returns (extra_json_fields, extra_images)
   representation             "absolute" | "relative" (H2)
-  slot_steps(action)         simulator steps for the slot (H4)
+  slot_steps(action, current_gripper=None)  simulator steps for the slot (H4)
   after_receipt(ctx, ...)    memory / bank updates (H5-H8)
   extra_calls(ctx, ...)      additional counted Qwen calls (H3, H8)
 """
@@ -36,7 +36,7 @@ class Method:
                previous: Mapping[str, bytes] | None) -> list[tuple[str, bytes]] | None:
         return None  # None = clean image window
 
-    def slot_steps(self, action) -> int:
+    def slot_steps(self, action, current_gripper=None) -> int:
         return SLOT_STEPS
 
     def after_receipt(self, ctx: Mapping[str, object], action, receipt) -> None:

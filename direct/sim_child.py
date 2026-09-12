@@ -361,7 +361,7 @@ class Child:
     def execute_base(self, environment: object, command: Mapping[str, object], chassis: ChassisHold,
                      public_raw: Mapping[str, object]) -> tuple[Mapping[str, object], dict[str, object]]:
         import numpy as np
-        from .chassis_hold import public_chassis_pose
+        from .chassis_hold import base_velocity_input, public_chassis_pose
         chassis_yaw = lambda state: public_chassis_pose(state)[2]
         axis = command["a"]
         velocity = float(command["v"])
@@ -374,15 +374,14 @@ class Child:
         gripper_open = float(command["g"])
         hold_q = _arm_qpos(environment)
         before = _public_state(public_raw, environment)
-        base = [0.0, 0.0, 0.0]
-        base[("x", "y", "yaw").index(axis)] = velocity
         executed = 0
         raw = public_raw
         trace = []
         for index in range(steps):
             if not self.budget_left():
                 break
-            raw = self.step(environment, hold_q, gripper_open, base if index < motion_steps else [0.0, 0.0, 0.0])
+            base = base_velocity_input(axis, velocity, chassis_yaw(raw), chassis.reset_yaw_rad) if index < motion_steps else [0.0, 0.0, 0.0]
+            raw = self.step(environment, hold_q, gripper_open, base)
             executed += 1
             trace.append([round(float(v), 4) for v in np.asarray(raw["state.base_position"]).reshape(-1)] + [round(chassis_yaw(raw), 4)])
         self.gripper_open = gripper_open
@@ -509,10 +508,11 @@ def run(task: str, seed: int, run: Path, scenes: Path, *, action_budget: int, wa
     terminal: dict[str, object] = {"status": "incomplete"}
     try:
         raw = reset_pinned_scene(environment, task, seed, scenes, run)
+        chassis = ChassisHold.from_public_state(raw)
         if restore_from is not None:
             child.restore(environment, restore_from)
             raw = environment.unwrapped.get_observation(environment.unwrapped._get_observations(force_update=True))
-        chassis = ChassisHold.from_public_state(raw)
+            chassis.reset_after_base_action(raw)
         child.started = time.monotonic()
         sequence = 0
         observation = child.publish(raw, environment, sequence, None)

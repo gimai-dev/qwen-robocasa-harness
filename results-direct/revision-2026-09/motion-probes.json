@@ -1,0 +1,136 @@
+{
+  "ik": [
+    {
+      "decision": 21,
+      "status": "partial",
+      "steps": 20,
+      "path": "joint_space_interpolation",
+      "max_commanded_joint_step_rad": 0.08003782411593062,
+      "tcp_displacement_m": 0.12064003068878659,
+      "target_error_after_slot_m": 0.6311148009245903,
+      "chassis_hold_error_xy_m": [
+        0.0008549690246582031,
+        -0.0001221299171447754
+      ]
+    },
+    {
+      "decision": 26,
+      "status": "partial",
+      "steps": 20,
+      "path": "joint_space_interpolation",
+      "max_commanded_joint_step_rad": 0.08003975995447142,
+      "tcp_displacement_m": 0.026891915548480482,
+      "target_error_after_slot_m": 0.4127226409408074,
+      "chassis_hold_error_xy_m": [
+        0.002793550491333008,
+        -0.00024640560150146484
+      ]
+    }
+  ],
+  "base": [
+    {
+      "turn": 0,
+      "axis": "x",
+      "heading_rad": -0.0014055722971617161,
+      "displacement_m": [
+        -0.15952062606811523,
+        -0.0009629726409912109
+      ],
+      "along_m": 0.15951911496377474,
+      "across_m": 0.0011871893887494247
+    },
+    {
+      "turn": 0,
+      "axis": "y",
+      "heading_rad": 1.569390765324368,
+      "displacement_m": [
+        0.0008606910705566406,
+        -0.15958833694458008
+      ],
+      "along_m": 0.15958696954919516,
+      "across_m": 0.0010850013640615662
+    },
+    {
+      "turn": 1,
+      "axis": "x",
+      "heading_rad": 0.46235756082639645,
+      "displacement_m": [
+        -0.14175033569335938,
+        -0.06751012802124023
+      ],
+      "along_m": 0.1569805538044033,
+      "across_m": -0.0028072730339541545
+    },
+    {
+      "turn": 1,
+      "axis": "y",
+      "heading_rad": 2.0331520452457172,
+      "displacement_m": [
+        0.0674886703491211,
+        -0.14181196689605713
+      ],
+      "along_m": 0.1570261478008596,
+      "across_m": -0.0028536795971753426
+    },
+    {
+      "turn": 2,
+      "axis": "x",
+      "heading_rad": 0.9260839553484882,
+      "displacement_m": [
+        -0.09292411804199219,
+        -0.12523746490478516
+      ],
+      "along_m": 0.15594335548436852,
+      "across_m": 0.0009920735533541056
+    },
+    {
+      "turn": 2,
+      "axis": "y",
+      "heading_rad": 2.4968785663425677,
+      "displacement_m": [
+        0.12524890899658203,
+        -0.09298932552337646
+      ],
+      "along_m": 0.15599168845602943,
+      "across_m": 0.0009471001866821075
+    }
+  ],
+  "ready_pose": {
+    "status": "completed",
+    "steps": 20,
+    "max_joint_delta_rad": 0.4042,
+    "steps_executed": 20,
+    "waypoints_total": 1,
+    "final_joint_error_rad": 0.0011,
+    "peak_force_n": 0.0,
+    "tcp_world_after_m": [
+      4.6157,
+      -1.552,
+      1.207
+    ],
+    "tcp_world_quat_after_xyzw": [
+      0.316,
+      0.9488,
+      0.001,
+      0.0002
+    ],
+    "gripper_width_after_m": 0.08,
+    "base_world_after_m": [
+      4.3473,
+      -1.9092,
+      0.7
+    ],
+    "budget_truncated": false,
+    "tracking_pauses": 4,
+    "tcp_moved_m": [
+      -0.0097,
+      -0.013,
+      -0.1963
+    ],
+    "base_moved_m": [
+      0.0,
+      0.0,
+      -0.0
+    ]
+  }
+}

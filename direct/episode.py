@@ -12,9 +12,11 @@ import subprocess
 import sys
 import time
 import traceback
+from copy import deepcopy
 from pathlib import Path
 
 from .actions import (MAX_FULL_SLOTS, SLOT_STEPS, decode_action, full_response_schema, short_response_schema)
+from .banks import observation_sequences
 from .executor import Receipt, Simulator, execute
 from .methods import make_method
 from .observation import build_user_message, image_list, read_images
@@ -24,6 +26,12 @@ from .policy import MAX_TOKENS_FULL, MAX_TOKENS_SHORT, MalformedOutput, QwenDire
 PROMPTS = Path(__file__).resolve().with_name("prompts")
 DEFAULT_SCENES = Path("/home/jli/state/qwen-direct/scenes")
 MAX_CONSECUTIVE_NO_MOTION = 8
+
+
+def preaction_record(observation: dict) -> dict:
+    return {"observation_sequence": observation["sequence"], "steps_used": observation["steps_used"],
+            "state_before": {**deepcopy(observation["public_state"]), "gripper_command": observation["gripper_command"]},
+            "requested_steps": None, "slot_steps": None, "executed_steps": 0}
 
 
 def load_system_prompt(interface: str, mode: str, suffix: str) -> str:
@@ -66,6 +74,7 @@ class Episode:
         (self.run / "config.json").write_text(json.dumps(self.config, indent=1))
         self.decisions: list[dict] = []
         self.started = time.monotonic()
+        self.final_state_wall_s = 0.0
         self.termination = "incomplete"
         self.previous_images: dict[str, bytes] | None = None
         self.previous: dict | None = None
@@ -88,23 +97,29 @@ class Episode:
         return {"action": action.summary() if action is not None else None, "result": receipt.summary()}
 
     def act(self, action, decision: int) -> Receipt:
-        receipt = execute(self.sim, action, slot_steps=self.method.slot_steps(action))
+        slot_steps = self.method.slot_steps(action, current_gripper=self.sim.observation["gripper_command"])
+        receipt = execute(self.sim, action, slot_steps=slot_steps)
+        if receipt.steps > 0:
+            self.final_state_wall_s = time.monotonic() - self.started
+        receipt.detail.update({"requested_steps": action.raw.get("s") or SLOT_STEPS, "slot_steps": slot_steps})
         return receipt
 
-    def load_history(self, source: Path, decision: int) -> None:
+    def load_history(self, source: Path, decision: int, slot: int | None = None) -> None:
         """Carry the source run's last action/receipt and pre-action images into the continuation."""
         rows = [json.loads(l) for l in (source / "decisions.jsonl").read_text().splitlines() if l.strip()]
-        last = next((r for r in reversed(rows) if r.get("decision") == decision and "slot" not in r), None)
+        last = next((r for r in reversed(rows) if r.get("decision") == decision and r.get("slot") == slot), None)
         if last is None:
             return
         self.previous = {"action": last.get("action"), "result": last.get("receipt") or {"status": last.get("status")}}
-        frames = sorted((source / "sim" / "frames").glob("*"))
-        seq = max(0, min(len(frames) - 1, last.get("steps", 0) and len(frames) - 2))
+        index = rows.index(last)
+        seq = observation_sequences(rows)[index][0]
+        frame = source / "sim" / "frames" / f"{seq:06d}"
         try:
-            self.previous_images = {label: (frames[seq] / f"{label}.png").read_bytes() for label in ("left", "right", "wrist")}
-        except Exception:
+            self.previous_images = {label: (frame / f"{label}.png").read_bytes() for label in ("left", "right", "wrist")}
+        except FileNotFoundError:
             self.previous_images = None
-        (self.run / "history-source.json").write_text(json.dumps({"source": str(source), "decision": decision, "previous": self.previous}, indent=1))
+        (self.run / "history-source.json").write_text(json.dumps({"source": str(source), "decision": decision, "slot": slot,
+            "observation_sequence": seq, "images_loaded": self.previous_images is not None, "previous": self.previous}, indent=1))
 
     # ---- short mode ----
     def run_short(self) -> None:
@@ -122,7 +137,7 @@ class Episode:
             observation, regions, images = self.observe(decision)
             ctx = {"decision": decision, "observation": observation, "regions": regions, "images": images,
                    "previous_images": self.previous_images, "previous": self.previous, "sim": self.sim,
-                   "client": self.client, "system_prompt": self.system_prompt}
+                   "client": self.client, "system_prompt": self.system_prompt, "method": self.method}
             extra, extra_images = self.method.observe(ctx)
             user_text = build_user_message(observation=observation, regions=regions, decision=decision,
                                            max_decisions=self.args.max_decisions, previous=self.previous, extra=extra)
@@ -130,7 +145,8 @@ class Episode:
             if image_window is None:
                 image_window = image_list(images, self.previous_images)
             image_window = image_window + extra_images
-            record = {"decision": decision, "steps_used": observation["steps_used"], "regions": len(regions["regions"])}
+            ctx.update({"user_text": user_text, "image_window": image_window})
+            record = {"decision": decision, **preaction_record(observation), "regions": len(regions["regions"])}
             try:
                 call = self.client.complete(system_prompt=self.system_prompt, user_text=user_text, images=image_window,
                                             response_schema=schema, max_tokens=MAX_TOKENS_SHORT, category="control", decision=decision)
@@ -171,11 +187,13 @@ class Episode:
                 continue
             record["action"] = action.summary()
             if action.kind == "stop":
-                record["status"] = "stop"
+                record.update({"status": "stop", "requested_steps": 0, "slot_steps": 0})
                 self.log_decision(record)
                 self.termination = "stop"; break
             receipt = self.act(action, decision)
-            record.update({"status": receipt.status, "steps": receipt.steps, "receipt": receipt.summary()})
+            record.update({"status": receipt.status, "steps": receipt.steps, "receipt": receipt.summary(),
+                           "requested_steps": receipt.detail["requested_steps"], "slot_steps": receipt.detail["slot_steps"],
+                           "executed_steps": receipt.steps, "observation_sequence_after": self.sim.observation["sequence"]})
             if receipt.child is not None:
                 record["tcp_after"] = receipt.child["tcp_world_after_m"]
             self.log_decision(record)
@@ -198,12 +216,13 @@ class Episode:
         schema = self.method.full_schema(interface) if hasattr(self.method, "full_schema") else full_response_schema(interface=interface)
         observation, regions, images = self.observe(1)
         ctx = {"decision": 1, "observation": observation, "regions": regions, "images": images, "previous_images": None,
-               "previous": None, "sim": self.sim, "client": self.client, "system_prompt": self.system_prompt}
+               "previous": None, "sim": self.sim, "client": self.client, "system_prompt": self.system_prompt, "method": self.method}
         extra, extra_images = self.method.observe(ctx)
         user_text = build_user_message(observation=observation, regions=regions, decision=1,
                                        max_decisions=1, previous=None, extra=extra)
         image_window = (self.method.images(ctx, images, None) or image_list(images, None)) + extra_images
-        record = {"decision": 1, "steps_used": 0, "regions": len(regions["regions"])}
+        ctx.update({"user_text": user_text, "image_window": image_window})
+        record = {"decision": 1, **preaction_record(observation), "regions": len(regions["regions"])}
         try:
             call = self.client.complete(system_prompt=self.system_prompt, user_text=user_text, images=image_window,
                                         response_schema=schema, max_tokens=MAX_TOKENS_FULL, category="control", decision=1)
@@ -219,7 +238,7 @@ class Episode:
         state = observation["public_state"]
         tcp = list(state["tcp_world_position_m"]); q = list(state["arm_q_rad"])
         for index, raw_action in enumerate(sequence, start=1):
-            entry = {"decision": 1, "slot": index, "raw_action": raw_action}
+            entry = {"decision": 1, "slot": index, "raw_action": raw_action, **preaction_record(self.sim.observation)}
             try:
                 action = decode_action(raw_action, interface=interface, representation=self.method.representation,
                                        current_tcp_world=tcp, current_q=q)
@@ -229,7 +248,9 @@ class Episode:
                 self.termination = f"invalid_action_at_slot_{index}"; return
             entry["action"] = action.summary()
             receipt = self.act(action, 1)
-            entry.update({"status": receipt.status, "steps": receipt.steps, "receipt": receipt.summary()})
+            entry.update({"status": receipt.status, "steps": receipt.steps, "receipt": receipt.summary(),
+                          "requested_steps": receipt.detail["requested_steps"], "slot_steps": receipt.detail["slot_steps"],
+                          "executed_steps": receipt.steps, "observation_sequence_after": self.sim.observation["sequence"]})
             self.log_decision(entry)
             if receipt.child is not None:
                 tcp = list(receipt.child["tcp_world_after_m"]); q = list(receipt.child["arm_q_after"])
@@ -243,6 +264,8 @@ class Episode:
     def run_episode(self) -> dict:
         outcome: dict = {}
         error_text = None
+        initialization_wall_s = 0.0
+        control_wall_s = None
         try:
             self.client = QwenDirectClient(log_path=self.run / "qwen-calls.jsonl")
             self.sam = SamClient(self.run / "sam.log")
@@ -250,17 +273,24 @@ class Episode:
                                  action_budget=self.args.steps_budget, wall_budget_s=self.args.wall_budget_s,
                                  restore_from=Path(self.args.restore_from) if self.args.restore_from else None)
             self.sim.launch()
+            self.started = time.monotonic()
             if getattr(self.args, "ready_pose", False):
                 from .executor import move_to_ready
+                ready_before = preaction_record(self.sim.observation)
                 ready = move_to_ready(self.sim)
-                self.log_decision({"decision": 0, "status": "ready_pose", "steps": ready.steps, "receipt": ready.summary()})
-            if self.args.history_from and self.args.history_decision:
-                self.load_history(Path(self.args.history_from), int(self.args.history_decision))
-            self.started = time.monotonic()
+                initialization_steps = self.sim.steps_used() - ready_before["steps_used"]
+                initialization_wall_s = time.monotonic() - self.started
+                self.final_state_wall_s = initialization_wall_s
+                self.log_decision({"decision": 0, **ready_before, "status": "ready_pose", "steps": initialization_steps,
+                                   "requested_steps": SLOT_STEPS, "slot_steps": SLOT_STEPS, "executed_steps": initialization_steps,
+                                   "observation_sequence_after": self.sim.observation["sequence"], "receipt": ready.summary()})
+            if self.args.history_from and self.args.history_decision is not None:
+                self.load_history(Path(self.args.history_from), int(self.args.history_decision), getattr(self.args, "history_slot", None))
             if self.args.mode == "short":
                 self.run_short()
             else:
                 self.run_full()
+            control_wall_s = time.monotonic() - self.started
             outcome = self.sim.finish()
         except Exception:
             error_text = traceback.format_exc()
@@ -287,10 +317,14 @@ class Episode:
             "official_success": bool(official) if official is not None else None,
             "termination": self.termination,
             "simulator_steps": outcome.get("simulator_steps"),
-            "decisions": len([d for d in self.decisions if "slot" not in d]),
-            "slots_executed": len(motion_decisions),
+            "decisions": len([d for d in self.decisions if "slot" not in d and d.get("decision", 0) > 0]),
+            "slots_executed": sum(d.get("observation_sequence_after", 1) - d.get("observation_sequence", 0) for d in motion_decisions),
+            "initialization_steps": sum(d.get("steps", 0) for d in self.decisions if d.get("decision") == 0),
+            "initialization_wall_s": round(initialization_wall_s, 2),
             "rejected_actions": len([d for d in self.decisions if d.get("steps") == 0 and d.get("status") not in ("stop",)]),
             "wall_s": round(time.monotonic() - self.started, 1),
+            "control_wall_s": control_wall_s,
+            "final_state_wall_s": self.final_state_wall_s,
             **(self.client.totals() if hasattr(self, "client") else {}),
             "sam_calls": getattr(getattr(self, "sam", None), "counter", 0),
             "sam_elapsed_s": round(getattr(getattr(self, "sam", None), "total_elapsed_s", 0.0), 1),
@@ -321,7 +355,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--restore-from", default=None, help="H8: simulator snapshot to continue from")
     parser.add_argument("--history-from", default=None, help="H8: source run directory whose decision history precedes the snapshot")
     parser.add_argument("--history-decision", type=int, default=None, help="H8: last decision index of the source run before the snapshot")
-    parser.add_argument("--ready-pose", action="store_true", help="move to the non-singular ready pose before the first decision (20 steps, not a decision)")
+    parser.add_argument("--history-slot", type=int, default=None, help="H8: selected slot when the source is a full trajectory")
+    parser.add_argument("--ready-pose", action="store_true", help="move to a bent-arm ready pose before the first decision (up to three 20-step slots, counted in budgets)")
     args = parser.parse_args(argv)
     result = Episode(args).run_episode()
     print(json.dumps({k: result[k] for k in ("task", "seed", "interface", "mode", "method", "official_success", "termination",

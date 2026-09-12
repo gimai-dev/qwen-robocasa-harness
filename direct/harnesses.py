@@ -93,7 +93,7 @@ class H2RelativeActions(Method):
 
 # ---------------------------------------------------------------- H4 -------
 class H4ExecutionTiming(Method):
-    """Qwen chooses how many steps (5, 10 or 20) of the planned motion to execute."""
+    """Qwen chooses arm/hold duration; base motion and gripper changes use a full slot."""
     name = "h4"
 
     def short_schema(self, interface):
@@ -102,26 +102,30 @@ class H4ExecutionTiming(Method):
     def prompt_suffix(self) -> str:
         return ("EXECUTION TIMING (this condition): every action carries an integer field `s` in {5, 10, 20}: the number of simulator "
                 "steps executed before you are observed again. Motion speed is unchanged (0.01 m per step along the line), so s=5 "
-                "moves at most 0.05 m and lets you re-observe sooner; s=20 is the full slot. Gripper changes always take 20 steps. "
+                "moves at most 0.05 m and lets you re-observe sooner; s=20 is the full slot. Short 5/10-step slots apply only to arm/hold "
+                "actions without a gripper-command change. Base actions always take 20 steps (16 drive + 4 brake); gripper changes also take 20 steps. "
                 "Short slots cost decisions from the same 180-decision budget.")
 
-    def slot_steps(self, action) -> int:
+    def slot_steps(self, action, current_gripper=None) -> int:
         steps = action.raw.get("s", SLOT_STEPS)
-        if action.gripper is not None:
+        if action.kind == "base" or (action.gripper is not None and action.gripper != current_gripper):
             return SLOT_STEPS
         return int(steps) if steps in (5, 10, 20) else SLOT_STEPS
 
 
 class H4Fixed5(Method):
-    """Control for H4: a fixed 5-step slot for every non-gripper action."""
+    """Control for H4: 5-step arm/hold slots; base motion and gripper changes use 20."""
     name = "h4c"
 
     def prompt_suffix(self) -> str:
-        return ("EXECUTION TIMING (this condition): each non-gripper action executes only 5 simulator steps (at most 0.05 m of motion) "
-                "before you are observed again; gripper changes take 20 steps. Plan targets accordingly and expect frequent partial receipts.")
+        return ("EXECUTION TIMING (this condition): arm/hold actions that keep the gripper command execute only 5 simulator steps (at most 0.05 m of motion) "
+                "before you are observed again. Base actions always take 20 steps (16 drive + 4 brake); gripper changes also take 20 steps. "
+                "Plan targets accordingly and expect frequent partial receipts.")
 
-    def slot_steps(self, action) -> int:
-        return SLOT_STEPS if action.gripper is not None else 5
+    def slot_steps(self, action, current_gripper=None) -> int:
+        if action.kind == "base" or (action.gripper is not None and action.gripper != current_gripper):
+            return SLOT_STEPS
+        return 5
 
 
 # ---------------------------------------------------------------- H5 -------

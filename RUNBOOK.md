@@ -96,14 +96,14 @@ Milestone inspection restores every snapshot of a run in a sandboxed child and r
 
 | Constant | Value | Where |
 |---|---|---|
-| Control slot | 20 simulator steps (1.0 s at 20 Hz); every accepted action consumes the whole slot | `actions.SLOT_STEPS` |
+| Control slot | 20 simulator steps (1.0 s at 20 Hz); H4/H4c arm/hold actions may request 5 or 10 when the gripper command is unchanged; base and gripper changes retain 20 | `actions.SLOT_STEPS` |
 | Full-mode sequence | at most 45 slots | `actions.MAX_FULL_SLOTS` |
 | EE path | straight line in position, slerp in orientation, IK every 0.01 m / 2.5 deg, one waypoint per step (0.2 m/s) | `kinematics.plan_pose_segment` |
-| EE fallback | if the straight line has no local IK solution (straight-arm home posture), direct multi-start IK + joint-space interpolation when the largest joint move is <= 1.6 rad; receipt `path` says which | `executor.execute` |
+| EE fallback | if the straight line has no local IK solution (straight-arm home posture), direct multi-start IK + bounded joint-space interpolation; execute the available prefix and return `partial` when it does not finish; receipt `path` says which | `executor.execute` |
 | Joint rate cap | 0.08 rad per step; tracking pauses when the measured lag exceeds 0.10 rad | `kinematics.MAX_JOINT_STEP`, `sim_child.TRACKING_LAG_PAUSE` |
 | Joint controller | JOINT_POSITION kp=150, damping ratio 1 (released harness configuration), torso absolute zero | `sim_child.joint_controller_config` |
 | Gripper | 0 closed / 1 open; drive +1 closed / -1 open inside robosuite; measured width `finger1 - finger2` (0.079 open, 0.002 closed empty) | `sim_child` |
-| Base | axis x/y/yaw, |v| <= 0.5, velocity for 10 steps then brake for 10; 0.5 -> 0.047 m or 0.216 rad per slot; arm joints held, chassis hold during arm motion | `actions`, `sim_child.execute_base`, `chassis_hold` |
+| Base | axis x/y/yaw, absolute v <= 0.5, velocity for 16 steps then brake for 4; 0.5 -> about 0.16 m or 0.464 rad per slot in free space; translation friction compensation preserves direction after turning; arm joints held, chassis hold during arm motion | `actions`, `sim_child.execute_base`, `chassis_hold` |
 | Orientation frame | FK `grip_site` frame (+z approach out of the gripper, fingers close along local x); the public eef quaternion is this frame rotated 90 deg about z and is only logged | `sim_child._public_state` |
 | Budgets | 900 steps, 1200 s, 180 decisions (episode); rejected actions cost a decision, not steps | `episode` |
 | Contact force | scalar: wrist force magnitude minus the free-hanging baseline magnitude (the sensor bias rotates with the wrist, so vector deltas are meaningless); Phase B ran with the earlier vector form | `sim_child.publish` |
@@ -170,3 +170,24 @@ Config `configs/robot_maniskill_qwen27b.yaml` (copy of `robot_maniskill.yaml`: e
 cd /home/jli/work/show-harness && export VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/nvidia_icd.json
 .venv/bin/python -u scripts/run_maniskill_qwen27b.py --robot-config configs/robot_maniskill_qwen27b.yaml --version v3 --episode-index 0 --max-steps 60
 ```
+
+
+## September 12 revision campaign
+
+The accepted repair plan is executed in a separate checkout and result root. Preserve all earlier raw runs. The serving model, scenes, perception setting, and budgets remain fixed. Code revision is recorded in every episode config.
+
+Run from the frozen revision checkout on h200-4 with the existing RoboCasa Python and `PYTHONPATH=.:runtime`:
+
+```bash
+python -m direct.revision_campaign --batch stage2 --parallel 3
+python -m direct.revision_campaign --batch stage3 --parallel 3
+python -m direct.revision_campaign --batch stage4 --parallel 3
+```
+
+Review each completed batch before launching the next. Stage2 has 27 EE-short episodes (clean, H2, clean+ready); Stage3 has 27 interface/sequence episodes (joint-short, EE-full, joint-full); Stage4 has 18 repaired H3/H4 episodes. Each condition uses the same three tasks and seeds 0-2. Results, fixed manifests, videos, and evaluator-only milestone inspection are under `/home/jli/state/qwen-direct/revision-2026-09/`.
+
+Ready initialization may take up to three 20-step slots. All initialization steps and elapsed time count toward episode budgets; decision0 records initialization and is excluded from VLM decision count. Each action records its actual observation sequence, requested/selected duration, and executed duration. `control_wall_s` ends before teardown; `wall_s` includes teardown and video rendering. `final_state_wall_s` records when the last executed action state was observed and provides conservative timing evidence for recovery qualification without charging later model waiting or video rendering to task completion. H3 previews replace current image slots, retaining prior images within the server's eight-image limit.
+
+H6 banks require actual pre-action state and same-failure correction evidence. H7 requires independently inspected object-following lift and transfer validation. Recovery candidates are not a qualified denominator until an independent continuation completes the original task from that exact snapshot within 400 steps, 600 seconds, and 80 decisions. An empty qualified set has RSR N/A.
+
+The restored-state chassis target is reset to the restored pose while retaining the inner controller frame from the scene reset. H3 yaw preview uses the measured nonlinear curve, including small nonzero motion at velocity0.1. The common prompt distinguishes straight Cartesian tracking from the bounded joint-space fallback; finger gap alone is described as contact evidence, not proof of holding.

@@ -1,6 +1,6 @@
 # Direct numerical Qwen control on RoboCasa: clean baselines and independent harness screen
 
-Status: living report, updated per phase. Numbers are machine-written from `result.json` / `summary.json` files listed in each section.
+Status: historical campaign report, corrected after the September 12 audit. Original raw runs remain intact. The repaired campaign is stored separately under `/home/jli/state/qwen-direct/revision-2026-09/`; historical results below are not results of the repaired executor.
 
 ## 1. Setting (fixed)
 
@@ -67,7 +67,7 @@ Code frozen at commit 7275128; matrix `/home/jli/state/qwen-direct/matrix/phaseB
 | clean | joint | short | 9 | 884 | 46.1 | 0.0 | 46.1 | 198019 | 7087 | 169 | 288 | 515 |
 
 
-What the traces show (EE-short): the dominant failure is target selection, not execution. Rejected targets were either beyond reach (0.7 m or more from the shoulder) or directly above the base at 1.6-1.8 m height; the base was blocked by furniture in the forward direction in every start and Qwen kept pushing it; when the arm did reach the object's neighbourhood it pressed on furniture (47-62 N) and the model did not interpret the force field (it read "holding the pizza cutter" with the gripper open). Full modes produce very short one-shot plans (1-4 EE actions) that stop at the first unreachable target; the 4,096-token limit was never reached (max 474 completion tokens), so truncation is not the cause.
+What the traces show (EE-short): many rejected targets were far from the shoulder or above the base at 1.6-1.8 m height. The later audit found that the executor also rejected solvable targets, so these traces do not isolate target selection from execution; the base was blocked by furniture in the forward direction in every start and Qwen kept pushing it; when the arm did reach the object's neighbourhood it pressed on furniture (47-62 N) and the model did not interpret the force field (it read "holding the pizza cutter" with the gripper open). Full modes produce very short one-shot plans (1-4 EE actions) that stop at the first unreachable target; the 4,096-token limit was never reached (max 474 completion tokens), so truncation is not the cause.
 
 Interface changes after Phase B, applied uniformly to every Phase C condition including its own clean control: contact force reported as norm growth over the free-hanging baseline (the vector form read a constant 214 N); partial receipts name contact blocking when the commanded path was exhausted under force; the prompt states the minimum horizontal reach; SAM prompt grid 16x16 (SAM was 60% of wall time under 3-way GPU contention).
 
@@ -75,8 +75,8 @@ Interface changes after Phase B, applied uniformly to every Phase C condition in
 
 ### Prerequisite status
 
-- H7 (successful skills): **not run, prerequisite missing.** The bank builder found exactly one local grasp-and-lift fragment in the nine clean EE-short development runs (CounterToDrawer seed 1, wooden spoon, grasp width 0.010 m, no complete-task success) and no second development start on which to validate it. A skill that was never validated on another initial state would be a single-episode recipe, which the isolation rule for H7 excludes.
-- H6 (failure experience): run (0/9) with the bank built from the nine Phase C clean EE-short runs (`/home/jli/state/qwen-direct/banks/phaseC/h6-failures.json`); records are unreachable targets, blocked base motions and empty closes with a correction marked verified only when a later action fixed the same failure type.
+- H7 (successful skills): **not run.** The old builder emitted one candidate from CounterToDrawer seed 1, but it was a false grasp-and-lift match: pre/post-state alignment and object-following evidence were missing. It is not a verified skill. Rebuild using evaluator-confirmed retained contact and object/TCP lift, then validate on a second development start.
+- H6 (failure experience): run (0/9), but its builder associated some failures with the wrong pre-action state and could label an unrelated later action as a verified correction. The stored bank must be rebuilt before evaluating the repaired method. H6 needs valid failure records; complete-task success is not a prerequisite.
 - H8 recovery-state evaluation: pending selection of recoverable failure states from the evaluator-side inspection of the Phase C clean runs.
 
 ### EE-short screen (72 episodes, done 2026-09-11)
@@ -144,12 +144,12 @@ The 4,096-token bound is not what limits full mode: the longest clean plan (10 a
 
 ### H8 separate recovery evaluation (done 2026-09-11)
 
-State bank: `results-direct/recovery/states.json` (5 states, selected evaluator-side from Phase C snapshots; one per source episode, split by source episode). The clean runs produced no candidate because clean never came within 10 cm of an object, so states were taken from the H1, H2, H3 and H4 runs that did: 2 empty closes near the object (H1 CounterToDrawer seed 2 at 260 steps, H4 CounterToSink seed 0 at 320 steps) and 3 contacts lost without a grasp (H1, H2, H3 on CounterToSink seed 2 at 460, 220 and 160 steps). Each continuation restores the exact simulator state, carries the preceding action/receipt and pre-action images, and runs with the recovery budget (400 steps, 600 s, 80 decisions).
+State bank: `results-direct/recovery/states.json` (5 states, selected evaluator-side from Phase C snapshots; one per source episode, split by source episode). The clean runs produced no candidate because clean never came within 10 cm of an object, so states were taken from the H1, H2, H3 and H4 runs that did: 2 empty closes near the object (H1 CounterToDrawer seed 2 at 260 steps, H4 CounterToSink seed 0 at 320 steps) and 3 contacts lost without a grasp (H1, H2, H3 on CounterToSink seed 2 at 460, 220 and 160 steps). Each continuation restored the simulator state and carried the preceding action/receipt, but the audit found that all ten runs loaded incorrect historical images. Runs used the recovery budget (400 steps, 600 s, 80 decisions).
 
-| Continuation | Recovered / states | RSR | Notes |
+| Continuation | Task completions / candidate states | Qualified RSR | Notes |
 |---|---|---|---|
-| clean | 0/5 | 0.00 | 4 ran the full 400 steps, 1 stopped after 40 steps |
-| H8 explicit recovery | 0/5 | 0.00 | 4 ran the full 400 steps (9-12 of 20 expectation checks were mismatches), 1 stopped at decision 1 with no motion |
+| clean | 0/5 | N/A | 4 ran the full 400 steps, 1 stopped after 40 steps |
+| H8 explicit recovery | 0/5 | N/A | 4 ran the full 400 steps (9-12 of 20 expectation checks were mismatches), 1 stopped at decision 1 with no motion |
 
 Recoverability of these five states is **unconfirmed**: the plan requires at least one independent continuation to complete the task within the budget, and none did. The table is therefore a paired comparison on states of unknown recoverability, not a recovery success rate; no L1-L4 breakdown is reported. Evaluator-side milestones of the continuations (`results-direct/recovery/phaseC-states-milestones.md`) show the states are physically recoverable at least to a grasp: from the same 5 states, clean re-approached in 4, re-grasped (held) in 3, lifted in 2 and displaced the object by more than 10 cm in 3; H8 re-approached in 4, held in 3, lifted in 2 and displaced in 0. Neither completed the task within the 400-step recovery budget. Raw data: `/home/jli/state/qwen-direct/recovery/phaseC-states/`.
 
@@ -223,7 +223,7 @@ Both successes are on the same start (CounterToSink seed 100: a glass cup; clean
 
 | method | interface | mode | n | sim steps | decisions | rejected | Qwen calls | prompt tok | completion tok | Qwen s | SAM s | wall s |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| clean | ee | short | 60 | 861 | 66.1 | 22.8 | 66.1 | 254210 | 9649 | 230 | 230 | 517 |
+| clean | ee | short | 60 | 877 | 67.7 | 23.6 | 67.7 | 259849 | 9882 | 235 | 232 | 525 |
 | h2 | ee | short | 60 | 866 | 65.1 | 21.4 | 65.1 | 256333 | 9803 | 233 | 242 | 540 |
 
 
@@ -258,18 +258,18 @@ All episodes actually run on h200-4 (one H200, vLLM Qwen3.8-27B BF16 shared by u
 | H8 recovery continuations | 10 | 3240 | 179 | 741618 | 32217 | 857 | 777 | 0.5 |
 | Phase D singles | 75 | 63740 | 5666 | 21242485 | 934548 | 21688 | 17407 | 12.2 |
 | Phase D combinations | 30 | 26100 | 2396 | 8855647 | 473747 | 10377 | 6148 | 5.2 |
-| Phase E test | 118 | 102800 | 7808 | 30377265 | 1157573 | 27527 | 28071 | 17.5 |
+| Phase E test | 120 | 104600 | 7969 | 30970905 | 1181097 | 28032 | 28475 | 17.8 |
 | Phase E infra-failed attempts | 2 | 840 | 67 | 255327 | 9539 | 228 | 252 | 0.1 |
 | development runs (Phase A, smoke) | 13 | 3140 | 143 | 566091 | 25221 | 588 | 389 | 0.3 |
-| **total** | 401 | 294800 | 24070 | 93250450 | 4023484 | 93711 | 83220 | 55.2 |
+| **total** | 403 | 296600 | 24231 | 93844090 | 4047008 | 94216 | 83625 | 55.4 |
 
 Per-episode means are in each block's results table; a short-mode episode costs about 65 Qwen calls, 250k prompt tokens, 10k completion tokens and 9 minutes of wall time under 3-way contention (about 4 minutes alone). H3 doubles the calls and completion tokens. Full mode costs one or two calls and under 30 s.
 
 ## 9. Recommendations for further work
 
 - The binding failure is target selection from 256x256 images plus region positions: the model rarely reaches the object (clean approach within 10 cm in 0/9 development and 2/15 validation starts). The one supported effect is the relative action representation (H2): on the 60-start test set it raises approach from 7 to 15 and contact from 5 to 12 (paired intervals exclude zero) without moving holds, lifts or success beyond noise. Kinematic previews (H3) remove rejections (0.5 per episode instead of 27) at double the call cost, with no downstream gain. Neither converts into grasps at a useful rate. A next step with a plausible mechanism is a grasp-stage representation change rather than more history: e.g. wrist-camera-anchored displacement commands, or an explicit "descend until contact" primitive that Qwen parameterizes numerically.
-- The recovery evaluation shows the failure states are recoverable to a grasp (3/5 re-grasps for both clean and H8) but not to task completion within 400 steps; the bottleneck after re-grasp is transport and release, not recovery detection.
-- H6/H7 need real successes to build banks from; the one clean development success (Phase B) did not repeat under the Phase C interface, and no validated skill exists. Any bank-based condition should wait for a controller with a non-zero grasp rate.
+- The recovery continuations recorded 3/5 holds per condition and no task completions, but no state was independently qualified as recoverable to original-task completion. The audit also found incorrect historical images in all ten continuations. Replace this comparison after fixing history and qualifying states; it does not isolate recovery detection from transport or release.
+- H6 can use valid failure experience even when task success is zero; rebuild its records with actual pre-action context. H7 needs verified successful skills. The existing candidate fails object-lift qualification and H7 remains untested.
 - Do not compare Phase B clean numbers with Phase C-E numbers: the interface changed between them (documented in section 3).
 
 ## 10. Deliverables
@@ -353,7 +353,7 @@ Matrix `/home/jli/state/qwen-direct/matrix/sem-test`; tables `results-direct/sem
 
 | Condition | Success | approach<=0.10 m | contact | hold | lift | displaced | median closest m | decisions | calls | wall s |
 |---|---|---|---|---|---|---|---|---|---|---|
-| numerical clean (Phase E) | 1/60 | 7 | 5 | 3 | 2 | 2 | 0.662 | 66 | 66 | 517 |
+| numerical clean (Phase E) | 1/60 | 7 | 5 | 3 | 2 | 2 | 0.662 | 68 | 68 | 525 |
 | numerical H2 relative (Phase E) | 1/60 | 15 | 12 | 5 | 4 | 6 | 0.323 | 65 | 65 | 540 |
 | `sem` (Show-Harness-style tokens) | 0/60 | 14 | 14 | 4 | 1 | 3 | 0.221 | 126 | 126 | 78 |
 | `sem+plan+rec` (+ subtask plan + recovery) | 0/60 | 14 | 10 | 3 | 3 | 6 | 0.260 | 136 | 137 | 135 |
@@ -363,10 +363,10 @@ Paired bootstrap differences (n=60, 95% intervals):
 - `sem+plan+rec` vs clean: approach +0.117 [0.000, +0.233]; contact +0.083 [-0.033, +0.200]; the rest within noise.
 - `sem` vs H2 and `sem+plan+rec` vs H2: every milestone difference is within noise (e.g. approach -0.017 [-0.167, +0.133]); success is 0/60 vs 1/60.
 
-Reading: in our loop the Show-Harness-style interface reproduces exactly what H2 (relative numerical displacements) already gave, the same pre-grasp improvement over absolute coordinates, and nothing beyond it: no gain in holds, lifts or task completion, with or without the subtask planner and empty-close recovery. It is, however, 4-7x cheaper per episode (78-135 s, 0.4-3.4k completion tokens) because each decision is one guided token.
+Reading: these semantic controller packages improved approach relative to the original absolute numerical controller and did not demonstrate improved complete-task success. Their difference from H2 remains uncertain, not an equivalence result. The packages are cheaper per episode (78-135 s, 0.4-3.4k completion tokens), but also change posture, remove SAM, reduce image inputs, and change action timing; cost and approach differences cannot be attributed to guided-token output alone.
 
 ### What the two lanes say together
 
-- Lane A: on Show-Harness's own tabletop benchmark, zero-shot Qwen-27B gets 1/30 with a degenerate GRASP loop, where the paper's frontier models get 86-96% and a 2B Qwen fine-tuned on a few GPU-hours of demonstrations gets 86%. The interface is not what the 27B model is missing; fine-grained spatial grounding is, and it does not appear zero-shot at this scale.
-- Lane B: inside our harder RoboCasa setting the same interface behaves sensibly (no GRASP loop, approaches in 14 of 60 starts) but is indistinguishable from the best numerical variant on every milestone and never completes a task.
-- Conclusion: for this model, changing the action interface (numerical, relative numerical, or discrete semantic tokens) moves only the pre-grasp stage; the grasp-and-transport stages need either a stronger VLM or supervised adaptation (Show-Harness's own route for small Qwen), not another harness.
+- Lane A: the tested ManiSkill configuration gets 1/30 with a repeated GRASP loop. This is a negative result for that configuration; the comparison does not isolate model capability from benchmark and implementation differences.
+- Lane B: the semantic packages approach in 14 of 60 starts and never complete a task. Their differences from H2 remain inconclusive, and the missing common-posture control prevents action-representation attribution.
+- Conclusion: these tested configurations did not demonstrate improved complete-task success. H2 improved approach and contact. The limiting cause is not isolated: the audit found execution and harness defects, H7 was untested, and the recovery comparison needs replacement. Additional harness designs remain an open empirical question.

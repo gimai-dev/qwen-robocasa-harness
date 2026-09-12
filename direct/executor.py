@@ -17,7 +17,7 @@ from pathlib import Path
 import numpy as np
 
 from .actions import Action, BASE_MOTION_STEPS, SLOT_STEPS, ee_rotation_matrix
-from .kinematics import MAX_FALLBACK_JOINT_DELTA, plan_pose_segment, solve_pose_multistart, world_to_base
+from .kinematics import plan_pose_segment, solve_pose_multistart, world_to_base
 
 SIM_ROOT = Path("/home/jli/work/robocasa-inspect-official")
 SIM_STATE = Path("/home/jli/state/robocasa-inspect-official")
@@ -193,7 +193,9 @@ def execute(sim: Simulator, action: Action, *, slot_steps: int = SLOT_STEPS,
             # interpolation when the straight Cartesian line has no local solution
             # (typical when leaving the straight-arm home posture).
             direct = solve_pose_multistart(q, p_base, r_base)
-            if direct["status"] == "kinematically_reachable" and direct["max_joint_delta_rad"] <= MAX_FALLBACK_JOINT_DELTA:
+            if direct["status"] == "kinematically_reachable":
+                # The child applies the same bounded joint stepping as a joint
+                # action and returns partial when this slot cannot finish it.
                 plan = {"status": "kinematically_reachable", "waypoints": [direct["q"]],
                         "segment_length_m": plan["segment_length_m"], "segment_angle_rad": plan["segment_angle_rad"]}
                 path_type = "joint_space_interpolation"
@@ -201,7 +203,7 @@ def execute(sim: Simulator, action: Action, *, slot_steps: int = SLOT_STEPS,
                 failed = plan["failed_result"]
                 return Receipt("unreachable", action, 0, {
                     "reason": ("joint-space discontinuity along the straight path (IK branch change)" if plan.get("reason") == "ik_discontinuity"
-                               else "target pose is not reachable by IK from the current configuration"),
+                               else "IK did not resolve this pose within the configured joint limits"),
                     "failed_fraction": round(plan["failed_fraction"], 3),
                     "residual_position_m": round(failed["position_error_m"], 4),
                     "residual_orientation_rad": round(failed["orientation_error_rad"], 4),

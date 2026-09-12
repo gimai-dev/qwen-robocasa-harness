@@ -26,6 +26,8 @@ def run_one(spec: dict, out: Path) -> dict:
     command = [PYTHON, "-m", module, "--task", spec["task"], "--seed", str(spec["seed"]), "--method", spec["method"], "--out", str(run)]
     if module == "direct.episode":
         command += ["--interface", spec["interface"], "--mode", spec["mode"], "--method-config", json.dumps(spec.get("method_config", {}))]
+        if spec.get("ready_pose"):
+            command.append("--ready-pose")
     for key in ("steps_budget", "wall_budget_s", "max_decisions"):
         if key in spec:
             command += [f"--{key.replace('_', '-')}", str(spec[key])]

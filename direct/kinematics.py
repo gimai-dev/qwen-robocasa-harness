@@ -133,17 +133,32 @@ def solve_pose(q_start: Sequence[float], position: Sequence[float],
     target = np.asarray(position, dtype=float)
     target_rotation = np.asarray(rotation, dtype=float)
 
-    def residual(q: np.ndarray) -> np.ndarray:
+    def residual(q: np.ndarray, regularization: float = REGULARIZATION) -> np.ndarray:
         actual_position, actual_rotation = panda_fk(q)
         # The weak pull toward q_start selects the nearest redundant solution
         # (joint3/joint5 are interchangeable when the arm is straight).
         return np.r_[actual_position - target,
                      0.25 * Rotation.from_matrix(target_rotation @ actual_rotation.T).as_rotvec(),
-                     REGULARIZATION * (q - start)]
+                     regularization * (q - start)]
 
     result = least_squares(residual, np.clip(start, *_BOUNDS), bounds=_BOUNDS,
                            max_nfev=max_nfev, ftol=1e-10, xtol=1e-10, gtol=1e-10)
     position_error, orientation_error = pose_errors(result.x, target, target_rotation)
+    nfev = result.nfev
+    refined = False
+    if position_error > POSITION_TOLERANCE_M or orientation_error > ORIENTATION_TOLERANCE_RAD:
+        # Posture is a preference, not part of the pose feasibility constraint.
+        # Start from the nearby regularized solution and finish the pose solve.
+        exact = least_squares(lambda q: residual(q, 0.0), result.x, bounds=_BOUNDS,
+                              max_nfev=max_nfev, ftol=1e-10, xtol=1e-10, gtol=1e-10)
+        nfev += exact.nfev
+        ep, eo = pose_errors(exact.x, target, target_rotation)
+        exact_reachable = ep <= POSITION_TOLERANCE_M and eo <= ORIENTATION_TOLERANCE_RAD
+        improves_error = (ep / POSITION_TOLERANCE_M + eo / ORIENTATION_TOLERANCE_RAD <
+                          position_error / POSITION_TOLERANCE_M + orientation_error / ORIENTATION_TOLERANCE_RAD)
+        if exact_reachable or improves_error:
+            result, position_error, orientation_error = exact, ep, eo
+            refined = True
     reachable = position_error <= POSITION_TOLERANCE_M and orientation_error <= ORIENTATION_TOLERANCE_RAD
     return {
         "status": "kinematically_reachable" if reachable else "kinematically_unresolved",
@@ -151,7 +166,8 @@ def solve_pose(q_start: Sequence[float], position: Sequence[float],
         "position_error_m": position_error,
         "orientation_error_rad": orientation_error,
         "min_joint_margin_rad": float(np.min(np.r_[result.x - _BOUNDS[0], _BOUNDS[1] - result.x])),
-        "nfev": int(result.nfev),
+        "nfev": int(nfev),
+        "pose_refined": refined,
     }
 
 
@@ -213,7 +229,6 @@ ELBOW_SEEDS = (
     (0.0, 0.6, 0.0, -1.2, 0.0, 1.8, 0.785),
     (0.0, -0.8, 0.0, -2.4, 0.0, 1.6, 0.785),
 )
-MAX_FALLBACK_JOINT_DELTA = 1.6   # rad; a joint-space fallback must complete within one 20-step slot
 
 
 def solve_pose_multistart(q_start: Sequence[float], position: Sequence[float],

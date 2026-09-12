@@ -29,13 +29,13 @@ class Combo(Method):
             m.representation = self.representation
         self.h1 = next((m for m in members if m.name == "h1"), None)
         self.h3 = next((m for m in members if m.name == "h3"), None)
-        self.h4 = next((m for m in members if m.name == "h4"), None)
+        self.h4 = next((m for m in members if m.name in ("h4", "h4c")), None)
 
     def prompt_suffix(self) -> str:
         return "\n".join(m.prompt_suffix() for m in self.members if m.prompt_suffix())
 
     def short_schema(self, interface):
-        extra = {"s": {"type": "integer", "enum": [5, 10, 20]}} if self.h4 else None
+        extra = {"s": {"type": "integer", "enum": [5, 10, 20]}} if self.h4 and self.h4.name == "h4" else None
         if self.h3:
             self.h3.interface = interface
             return {"type": "object", "additionalProperties": False,
@@ -62,8 +62,8 @@ class Combo(Method):
     def images(self, ctx, current, previous):
         return self.h1.images(ctx, current, previous) if self.h1 else None
 
-    def slot_steps(self, action) -> int:
-        return self.h4.slot_steps(action) if self.h4 else SLOT_STEPS
+    def slot_steps(self, action, current_gripper=None) -> int:
+        return self.h4.slot_steps(action, current_gripper=current_gripper) if self.h4 else SLOT_STEPS
 
     def after_receipt(self, ctx, action, receipt) -> None:
         for m in self.members:
