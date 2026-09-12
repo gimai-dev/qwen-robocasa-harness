@@ -321,7 +321,7 @@ class Episode:
             "slots_executed": sum(d.get("observation_sequence_after", 1) - d.get("observation_sequence", 0) for d in motion_decisions),
             "initialization_steps": sum(d.get("steps", 0) for d in self.decisions if d.get("decision") == 0),
             "initialization_wall_s": round(initialization_wall_s, 2),
-            "rejected_actions": len([d for d in self.decisions if d.get("steps") == 0 and d.get("status") not in ("stop",)]),
+            "rejected_actions": len([d for d in self.decisions if d.get("steps", 0) == 0 and d.get("status") not in (None, "stop")]),
             "wall_s": round(time.monotonic() - self.started, 1),
             "control_wall_s": control_wall_s,
             "final_state_wall_s": self.final_state_wall_s,

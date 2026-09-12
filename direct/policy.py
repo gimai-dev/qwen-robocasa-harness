@@ -75,18 +75,30 @@ class QwenDirectClient:
                 "name": "direct_control", "schema": dict(response_schema), "strict": True}},
         }
         verify_process(self.attestation)
-        started = time.monotonic()
-        response = self.http.post("chat/completions", json=payload)
-        latency = time.monotonic() - started
-        self.calls += 1
-        self.latency_s += latency
         record: dict[str, object] = {
-            "decision": decision, "category": category, "latency_s": round(latency, 2),
-            "http_status": response.status_code, "max_tokens": max_tokens,
+            "decision": decision, "category": category, "max_tokens": max_tokens,
             "system_prompt_sha256": hashlib.sha256(system_prompt.encode()).hexdigest()[:16],
             "user_text": user_text, "image_labels": [label for label, _ in images],
             "image_sha256": [hashlib.sha256(data).hexdigest()[:16] for _, data in images],
         }
+        self.calls += 1
+        bucket = self.by_category.setdefault(category, {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0, "latency_s": 0.0})
+        bucket["calls"] += 1
+        started = time.monotonic()
+        try:
+            response = self.http.post("chat/completions", json=payload)
+        except httpx.RequestError as error:
+            latency = time.monotonic() - started
+            self.latency_s += latency
+            bucket["latency_s"] += latency
+            record.update({"latency_s": round(latency, 2), "http_status": None, "usage": None,
+                           "transport_error": type(error).__name__, "error": str(error).replace(self._token, "[REDACTED]")[:2000]})
+            self._log(record)
+            raise InfrastructureError(f"Qwen transport {type(error).__name__}: {record['error'][:300]}") from error
+        latency = time.monotonic() - started
+        self.latency_s += latency
+        bucket["latency_s"] += latency
+        record.update({"latency_s": round(latency, 2), "http_status": response.status_code})
         if response.is_error:
             record.update({"error": response.text.replace(self._token, "[REDACTED]")[:2000]})
             self._log(record)
@@ -97,11 +109,8 @@ class QwenDirectClient:
         usage = body.get("usage", {})
         self.prompt_tokens += int(usage.get("prompt_tokens", 0))
         self.completion_tokens += int(usage.get("completion_tokens", 0))
-        bucket = self.by_category.setdefault(category, {"calls": 0, "prompt_tokens": 0, "completion_tokens": 0, "latency_s": 0.0})
-        bucket["calls"] += 1
         bucket["prompt_tokens"] += int(usage.get("prompt_tokens", 0))
         bucket["completion_tokens"] += int(usage.get("completion_tokens", 0))
-        bucket["latency_s"] += latency
         record.update({"raw": raw, "finish_reason": choice.get("finish_reason"), "usage": usage})
         parsed = None
         try:

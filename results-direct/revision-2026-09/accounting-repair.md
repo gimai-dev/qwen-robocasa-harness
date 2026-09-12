@@ -1,0 +1,7 @@
+# Invalid-action and request-attempt accounting
+
+The retained joint-guide attempts contain 15 `invalid_action` events, but the old final counters reported zero rejected actions. Those events omit `steps`; the counter required an explicit zero. The final count now includes zero-step or missing-step failure events and excludes stop events and full-plan headers. Completed trajectories are unchanged. Comparisons of earlier runs derive rejection counts from their decision logs and retain the original result files.
+
+A Stage2 Qwen connection reset also occurred before the request counter and call record were created. The retained attempt contains five logged calls plus one unlogged attempted request; the latter's token usage is unknown. The client now counts an attempted request before HTTP, records transport failures with null HTTP status and usage, charges observed latency to both global and category totals, and raises the existing infrastructure error. Successful requests remain counted once. No retry, request-payload, prompt, or execution behavior was added.
+
+Three focused tests cover invalid short/full events, the observed connection reset, and successful-call accounting. Before repair they produced one error and two failed subcases. All three pass after repair, and all 47 repair tests pass locally and on h200-4. A separate read-only review found no actionable issue. This accounting-only revision is used for Stage4 onward; Stage3 continues at `ef3e956` and uses event-derived rejection counts in analysis.

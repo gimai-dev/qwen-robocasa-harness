@@ -36,6 +36,8 @@ The campaign runner produces27/27/18 unique core runs, routes ready initializati
 
 ## Limits of this evidence
 
+A reporting follow-up counts invalid actions whose event rows omit `steps` and logs/counts transport-failed request attempts with unknown token usage. Three new regressions reproduce those failures and preserve successful-call accounting; all47 repair tests pass locally and remotely. Focused review found no actionable issue. See `accounting-repair.md`. Prompts, request payloads, and physics are unchanged; earlier comparisons derive rejection totals from event logs.
+
 Stage3 subsequently exposed a joint-guide contract mismatch: advertised joint endpoints could be rejected by the decoder. The two joint guides now advertise accepted endpoints and qualify their downward-orientation formula with zero shoulder/forearm roll. The endpoint regression failed18 subcases before the repair and passes all28 afterward. All44 repair tests pass locally and remotely. See `joint-guide-repair.md`. EE prompts and the shared executor are unchanged, so Stage2 remains valid.
 
 The first Stage 2 attempts subsequently exposed a reset-transient force baseline. The focused follow-up replaces it with robot-derived unloaded weight and marks initial sensor feedback unavailable until stepping. All43 repair regressions pass locally and remotely. See `force-repair.md` and `force-probes.json` for the physical measurements and separately retained invalid attempts.
