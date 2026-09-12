@@ -8,7 +8,7 @@ Original plan: `/Users/jiachen/Documents/Codex/2026-09-10/qwen-https-robocurve-o
 
 Fixed decoding: seed 3074294, temperature 0, top_p 1, thinking off, strict JSON schema. Budget per episode: 900 sim steps, 1200 s, 180 decisions; control slot 20 sim steps. Tasks: PickPlaceCounterToSink, PickPlaceCounterToDrawer, PickPlaceStoveToCounter. Seeds: dev 0-2, validation 10-14, test 100-119.
 
-## 2. What was built (all committed on branch `direct-control`, 50 commits)
+## 2. What was built (all committed on branch `direct-control`, 45 commits)
 
 Repo: `~/Desktop/first try/qwen-direct-control` (clone of the published harness, history preserved). Box mirror: `h200-4:/home/jli/work/qwen-direct-control` (frozen, used by matrices) and `.../qwen-direct-control-dev` (development). Package `direct/`:
 
