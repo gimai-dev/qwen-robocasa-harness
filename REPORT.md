@@ -2,6 +2,8 @@
 
 Status: historical campaign report, corrected after the September 12 audit. Original raw runs remain intact. The repaired campaign is stored separately under `/home/jli/state/qwen-direct/revision-2026-09/`; historical results below are not results of the repaired executor.
 
+The repaired campaign is complete; see the [revision handoff](HANDOFF-REVISION-2026-09-12.md) and [final report](results-direct/revision-2026-09/revision-campaign-report.md).
+
 ## 1. Setting (fixed)
 
 RoboCasa 1.0.1 / robosuite 1.5.2 / MuJoCo 3.3.1, PandaOmron (7-DoF arm, parallel-jaw gripper, mobile base, torso held at zero), frozen Qwen3.8-27B BF16 (`qwen3.8-27b-bf16`, vLLM, loopback on h200-4), temperature 0 / top_p 1 / thinking off / strict JSON schema, SAM2.1 Hiera Small on the three official 256x256 RGB views with the official camera calibration. Policy-visible information: public joint/TCP/gripper/base state, wrist wrench relative to baseline, execution receipts, SAM regions with multi-view triangulated positions, current three views and the three views from before the previous action. Budget 900 simulator steps / 1200 s / 180 decisions; control slot 20 steps. Official success is the RoboCasa task predicate evaluated by the simulator at `stop` or budget end. Full protocol constants: RUNBOOK.md.

@@ -1,0 +1,51 @@
+{
+  "scope": "RoboCasa project state /home/jli/state/qwen-direct, historical result files excluding revision-2026-09",
+  "historical_result_files": 563,
+  "historical_seeds_per_each_task": [
+    0,
+    1,
+    2,
+    10,
+    11,
+    12,
+    13,
+    14,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111,
+    112,
+    113,
+    114,
+    115,
+    116,
+    117,
+    118,
+    119
+  ],
+  "old_validation_proposal": [
+    10,
+    11,
+    12,
+    13,
+    14
+  ],
+  "overlap_evidence": "matrix/phaseD-singles and matrix/phaseD-combos already contain all three tasks at these seeds",
+  "revised_validation_seeds": [
+    20,
+    21,
+    22,
+    23,
+    24
+  ],
+  "configured_run_overlap_for_revised_seeds": [],
+  "decision": "Reserve20-24 before inspecting their outcomes; validation remains conditional on useful single-harness development evidence. The task and maximum45episode budget are unchanged."
+}

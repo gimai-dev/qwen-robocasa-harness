@@ -1,5 +1,7 @@
 # Qwen RoboCasa Harness
 
+**Direct numerical-control branch:** the repaired campaign and fresh validation are complete. See the [revision handoff](HANDOFF-REVISION-2026-09-12.md) for the current results and proposed next experiments. The original recipe-based project is documented below.
+
 A task-routed manipulation harness that combines a frozen Qwen vision-language model, RGB geometry, numerical robot control, and outcome-grounded experience memory.
 
 The latest completed evaluation achieved **5 successes out of 10 tasks (50%)**, compared with **2/10 (20%)** in the earlier ten-task baseline. Both use the original seed-7 pick-and-place scenes and a budget of 900 simulator actions per task. The latest cohort took **20.0 minutes**, used **6,196 simulator actions**, and made **132 Qwen calls**.

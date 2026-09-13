@@ -1,0 +1,400 @@
+{
+  "selection": {
+    "candidates": [
+      "h7",
+      "h8"
+    ],
+    "baseline": "clean",
+    "tasks": [
+      "PickPlaceCounterToSink",
+      "PickPlaceCounterToDrawer",
+      "PickPlaceStoveToCounter"
+    ],
+    "seeds": [
+      20,
+      21,
+      22,
+      23,
+      24
+    ],
+    "episodes_per_condition": 15,
+    "total_episodes": 45,
+    "code_revision": "1223102",
+    "runtime": "/home/jli/work/qwen-direct-control-revision-r7",
+    "selection_timing": "After all117 development episodes and their simulator inspections; before any validation scene setup or policy rollout.",
+    "h7_reason": "Seven of nine development starts contact the target and six reach closed-gripper contact, versus clean two and one. Two lift episodes and zero task successes. Verified local-skill context is a distinct mechanism whose broad grasping progress warrants checking on new starts.",
+    "h8_reason": "Three of nine development starts lift the target versus clean one, retaining the clean lift start and adding two others. Zero task successes. Explicit effect reasoning has the strongest observed lift signal at modest additional aggregate runtime.",
+    "other_candidates": "H1 has two lifts and zero repaired task successes; H3 has two lifts at roughly twice clean runtime; H6 has two lifts but coarse, mostly fixed retrieval; H5 has one lift and higher runtime; H4 and H2 do not add lifts. Keep these as development results rather than widening validation.",
+    "interface": "ee",
+    "mode": "short",
+    "ready_pose": false,
+    "steps_budget": 900,
+    "wall_budget_s": 1200,
+    "max_decisions": 180,
+    "parallel_policy_workers": 3,
+    "frozen_h7_bank": "/home/jli/state/qwen-direct/revision-2026-09/banks/h7-skills.json",
+    "bank_source": "Two overlapping grasp/lift fragments from the single repaired clean StoveToCounter seed2 episode; no H1/H3/H7/H8 examples are added.",
+    "primary_outcome": "Official complete-task success on matched starts, with paired gains/losses and uncertainty on observed success rates.",
+    "secondary_outcomes": [
+      "approach",
+      "target contact",
+      "closed-gripper contact",
+      "retained lift",
+      "Qwen calls/tokens",
+      "simulator steps",
+      "Qwen/SAM/episode time",
+      "failure transitions"
+    ],
+    "continuation_rule": "Complete the fixed45 scored episodes. Retain infrastructure failures separately and rerun only their identical starts. Do not change prompts, model settings, banks, or controller behavior based on validation outcomes. No automatic120\u2013180-episode confirmation."
+  },
+  "interval_method": "Two-sided 95% Clopper\u2013Pearson exact binomial intervals for each observed task-success rate; descriptive under a binomial model across these sampled starts. The paired comparison is reported as matched gains/losses, not inferred from overlapping rate intervals.",
+  "conditions": {
+    "ee-clean": {
+      "n": 15,
+      "successes": 0,
+      "success_rate": 0.0,
+      "success_rate_95_exact_interval": [
+        0.0,
+        0.218019360910534
+      ],
+      "milestones": {
+        "approach": 3,
+        "contact": 4,
+        "hold": 3,
+        "lift": 2
+      },
+      "sampled_any_successes": 0,
+      "verified_retained_lift_episodes": 2,
+      "paired_against_clean": {
+        "success": {
+          "gains": [],
+          "losses": [],
+          "both_positive": 0,
+          "both_negative": 15
+        },
+        "approach": {
+          "gains": [],
+          "losses": [],
+          "both_positive": 3,
+          "both_negative": 12
+        },
+        "contact": {
+          "gains": [],
+          "losses": [],
+          "both_positive": 4,
+          "both_negative": 11
+        },
+        "hold": {
+          "gains": [],
+          "losses": [],
+          "both_positive": 3,
+          "both_negative": 12
+        },
+        "lift": {
+          "gains": [],
+          "losses": [],
+          "both_positive": 2,
+          "both_negative": 13
+        }
+      },
+      "costs": {
+        "simulator_steps": 12340,
+        "decisions": 684,
+        "qwen_calls": 684,
+        "prompt_tokens": 2761241,
+        "completion_tokens": 102858,
+        "qwen_latency_s": 2446.9,
+        "sam_elapsed_s": 2905.7,
+        "wall_s": 6194.0,
+        "rejected_actions": 60,
+        "initialization_steps": 0,
+        "initialization_wall_s": 0
+      },
+      "by_task": {
+        "PickPlaceCounterToSink": {
+          "n": 5,
+          "successes": 0
+        },
+        "PickPlaceCounterToDrawer": {
+          "n": 5,
+          "successes": 0
+        },
+        "PickPlaceStoveToCounter": {
+          "n": 5,
+          "successes": 0
+        }
+      }
+    },
+    "ee-h7": {
+      "n": 15,
+      "successes": 0,
+      "success_rate": 0.0,
+      "success_rate_95_exact_interval": [
+        0.0,
+        0.218019360910534
+      ],
+      "milestones": {
+        "approach": 8,
+        "contact": 6,
+        "hold": 5,
+        "lift": 2
+      },
+      "sampled_any_successes": 0,
+      "verified_retained_lift_episodes": 2,
+      "paired_against_clean": {
+        "success": {
+          "gains": [],
+          "losses": [],
+          "both_positive": 0,
+          "both_negative": 15
+        },
+        "approach": {
+          "gains": [
+            {
+              "task": "PickPlaceCounterToDrawer",
+              "seed": 20
+            },
+            {
+              "task": "PickPlaceCounterToDrawer",
+              "seed": 21
+            },
+            {
+              "task": "PickPlaceStoveToCounter",
+              "seed": 20
+            },
+            {
+              "task": "PickPlaceStoveToCounter",
+              "seed": 23
+            },
+            {
+              "task": "PickPlaceStoveToCounter",
+              "seed": 24
+            }
+          ],
+          "losses": [],
+          "both_positive": 3,
+          "both_negative": 7
+        },
+        "contact": {
+          "gains": [
+            {
+              "task": "PickPlaceCounterToDrawer",
+              "seed": 20
+            },
+            {
+              "task": "PickPlaceStoveToCounter",
+              "seed": 20
+            },
+            {
+              "task": "PickPlaceStoveToCounter",
+              "seed": 24
+            }
+          ],
+          "losses": [
+            {
+              "task": "PickPlaceCounterToDrawer",
+              "seed": 21
+            }
+          ],
+          "both_positive": 3,
+          "both_negative": 8
+        },
+        "hold": {
+          "gains": [
+            {
+              "task": "PickPlaceCounterToDrawer",
+              "seed": 20
+            },
+            {
+              "task": "PickPlaceCounterToDrawer",
+              "seed": 23
+            },
+            {
+              "task": "PickPlaceStoveToCounter",
+              "seed": 20
+            }
+          ],
+          "losses": [
+            {
+              "task": "PickPlaceCounterToDrawer",
+              "seed": 21
+            }
+          ],
+          "both_positive": 2,
+          "both_negative": 9
+        },
+        "lift": {
+          "gains": [
+            {
+              "task": "PickPlaceCounterToDrawer",
+              "seed": 23
+            }
+          ],
+          "losses": [
+            {
+              "task": "PickPlaceCounterToSink",
+              "seed": 20
+            }
+          ],
+          "both_positive": 1,
+          "both_negative": 12
+        }
+      },
+      "costs": {
+        "simulator_steps": 12660,
+        "decisions": 693,
+        "qwen_calls": 693,
+        "prompt_tokens": 3379448,
+        "completion_tokens": 103584,
+        "qwen_latency_s": 2518.9,
+        "sam_elapsed_s": 2836.5,
+        "wall_s": 6208.5,
+        "rejected_actions": 56,
+        "initialization_steps": 0,
+        "initialization_wall_s": 0
+      },
+      "by_task": {
+        "PickPlaceCounterToSink": {
+          "n": 5,
+          "successes": 0
+        },
+        "PickPlaceCounterToDrawer": {
+          "n": 5,
+          "successes": 0
+        },
+        "PickPlaceStoveToCounter": {
+          "n": 5,
+          "successes": 0
+        }
+      }
+    },
+    "ee-h8": {
+      "n": 15,
+      "successes": 0,
+      "success_rate": 0.0,
+      "success_rate_95_exact_interval": [
+        0.0,
+        0.218019360910534
+      ],
+      "milestones": {
+        "approach": 4,
+        "contact": 3,
+        "hold": 2,
+        "lift": 2
+      },
+      "sampled_any_successes": 0,
+      "verified_retained_lift_episodes": 1,
+      "paired_against_clean": {
+        "success": {
+          "gains": [],
+          "losses": [],
+          "both_positive": 0,
+          "both_negative": 15
+        },
+        "approach": {
+          "gains": [
+            {
+              "task": "PickPlaceStoveToCounter",
+              "seed": 20
+            },
+            {
+              "task": "PickPlaceStoveToCounter",
+              "seed": 24
+            }
+          ],
+          "losses": [
+            {
+              "task": "PickPlaceCounterToSink",
+              "seed": 20
+            }
+          ],
+          "both_positive": 2,
+          "both_negative": 10
+        },
+        "contact": {
+          "gains": [
+            {
+              "task": "PickPlaceStoveToCounter",
+              "seed": 24
+            }
+          ],
+          "losses": [
+            {
+              "task": "PickPlaceCounterToDrawer",
+              "seed": 21
+            },
+            {
+              "task": "PickPlaceCounterToSink",
+              "seed": 20
+            }
+          ],
+          "both_positive": 2,
+          "both_negative": 10
+        },
+        "hold": {
+          "gains": [
+            {
+              "task": "PickPlaceCounterToDrawer",
+              "seed": 23
+            }
+          ],
+          "losses": [
+            {
+              "task": "PickPlaceCounterToDrawer",
+              "seed": 21
+            },
+            {
+              "task": "PickPlaceCounterToSink",
+              "seed": 20
+            }
+          ],
+          "both_positive": 1,
+          "both_negative": 11
+        },
+        "lift": {
+          "gains": [
+            {
+              "task": "PickPlaceCounterToDrawer",
+              "seed": 23
+            }
+          ],
+          "losses": [
+            {
+              "task": "PickPlaceCounterToSink",
+              "seed": 20
+            }
+          ],
+          "both_positive": 1,
+          "both_negative": 12
+        }
+      },
+      "costs": {
+        "simulator_steps": 11960,
+        "decisions": 651,
+        "qwen_calls": 651,
+        "prompt_tokens": 2853092,
+        "completion_tokens": 144556,
+        "qwen_latency_s": 3346.4,
+        "sam_elapsed_s": 2234.7,
+        "wall_s": 6369.2,
+        "rejected_actions": 47,
+        "initialization_steps": 0,
+        "initialization_wall_s": 0
+      },
+      "by_task": {
+        "PickPlaceCounterToSink": {
+          "n": 5,
+          "successes": 0
+        },
+        "PickPlaceCounterToDrawer": {
+          "n": 5,
+          "successes": 0
+        },
+        "PickPlaceStoveToCounter": {
+          "n": 5,
+          "successes": 0
+        }
+      }
+    }
+  }
+}

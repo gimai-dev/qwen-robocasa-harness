@@ -1,0 +1,590 @@
+{
+  "note": "Matched development starts; source banks use clean development episodes. Repaired H1 replaces three exposed runs; original outcomes remain retained. Milestones use sampled evaluator states, with task success taken from the terminal result.",
+  "conditions": [
+    {
+      "condition": "ee-clean",
+      "label": "EE short \u00b7 clean",
+      "n": 9,
+      "successes": 0,
+      "sampled_any_successes": 0,
+      "milestones": {
+        "approach": 2,
+        "contact": 2,
+        "hold": 1,
+        "lift": 1
+      },
+      "paired_against_clean": {
+        "approach": {
+          "gains": 0,
+          "losses": 0
+        },
+        "contact": {
+          "gains": 0,
+          "losses": 0
+        },
+        "hold": {
+          "gains": 0,
+          "losses": 0
+        },
+        "lift": {
+          "gains": 0,
+          "losses": 0
+        }
+      },
+      "costs": {
+        "simulator_steps": 7280,
+        "decisions": 398,
+        "qwen_calls": 398,
+        "prompt_tokens": 1606055,
+        "completion_tokens": 58119,
+        "qwen_latency_s": 1387.2,
+        "sam_elapsed_s": 1365.7,
+        "wall_s": 3267.8,
+        "rejected_actions": 32,
+        "initialization_steps": 0,
+        "initialization_wall_s": 0
+      }
+    },
+    {
+      "condition": "joint-clean",
+      "label": "Joint short \u00b7 clean",
+      "n": 9,
+      "successes": 0,
+      "sampled_any_successes": 0,
+      "milestones": {
+        "approach": 0,
+        "contact": 0,
+        "hold": 0,
+        "lift": 0
+      },
+      "paired_against_clean": {
+        "approach": {
+          "gains": 0,
+          "losses": 2
+        },
+        "contact": {
+          "gains": 0,
+          "losses": 2
+        },
+        "hold": {
+          "gains": 0,
+          "losses": 1
+        },
+        "lift": {
+          "gains": 0,
+          "losses": 1
+        }
+      },
+      "costs": {
+        "simulator_steps": 7400,
+        "decisions": 381,
+        "qwen_calls": 381,
+        "prompt_tokens": 1640878,
+        "completion_tokens": 57884,
+        "qwen_latency_s": 1302.2,
+        "sam_elapsed_s": 1075.7,
+        "wall_s": 2864.1,
+        "rejected_actions": 4,
+        "initialization_steps": 0,
+        "initialization_wall_s": 0
+      }
+    },
+    {
+      "condition": "ee-full",
+      "label": "EE full \u00b7 clean",
+      "n": 9,
+      "successes": 0,
+      "sampled_any_successes": 0,
+      "milestones": {
+        "approach": 0,
+        "contact": 0,
+        "hold": 0,
+        "lift": 0
+      },
+      "paired_against_clean": {
+        "approach": {
+          "gains": 0,
+          "losses": 2
+        },
+        "contact": {
+          "gains": 0,
+          "losses": 2
+        },
+        "hold": {
+          "gains": 0,
+          "losses": 1
+        },
+        "lift": {
+          "gains": 0,
+          "losses": 1
+        }
+      },
+      "costs": {
+        "simulator_steps": 740,
+        "decisions": 9,
+        "qwen_calls": 9,
+        "prompt_tokens": 32712,
+        "completion_tokens": 3710,
+        "qwen_latency_s": 83.7,
+        "sam_elapsed_s": 30.1,
+        "wall_s": 175.5,
+        "rejected_actions": 3,
+        "initialization_steps": 0,
+        "initialization_wall_s": 0
+      }
+    },
+    {
+      "condition": "joint-full",
+      "label": "Joint full \u00b7 clean",
+      "n": 9,
+      "successes": 0,
+      "sampled_any_successes": 0,
+      "milestones": {
+        "approach": 0,
+        "contact": 0,
+        "hold": 0,
+        "lift": 0
+      },
+      "paired_against_clean": {
+        "approach": {
+          "gains": 0,
+          "losses": 2
+        },
+        "contact": {
+          "gains": 0,
+          "losses": 2
+        },
+        "hold": {
+          "gains": 0,
+          "losses": 1
+        },
+        "lift": {
+          "gains": 0,
+          "losses": 1
+        }
+      },
+      "costs": {
+        "simulator_steps": 1420,
+        "decisions": 9,
+        "qwen_calls": 9,
+        "prompt_tokens": 34593,
+        "completion_tokens": 5597,
+        "qwen_latency_s": 122.7,
+        "sam_elapsed_s": 31.8,
+        "wall_s": 259.8,
+        "rejected_actions": 0,
+        "initialization_steps": 0,
+        "initialization_wall_s": 0
+      }
+    },
+    {
+      "condition": "ee-clean-ready",
+      "label": "EE short \u00b7 ready",
+      "n": 9,
+      "successes": 0,
+      "sampled_any_successes": 0,
+      "milestones": {
+        "approach": 2,
+        "contact": 1,
+        "hold": 1,
+        "lift": 0
+      },
+      "paired_against_clean": {
+        "approach": {
+          "gains": 2,
+          "losses": 2
+        },
+        "contact": {
+          "gains": 1,
+          "losses": 2
+        },
+        "hold": {
+          "gains": 1,
+          "losses": 1
+        },
+        "lift": {
+          "gains": 0,
+          "losses": 1
+        }
+      },
+      "costs": {
+        "simulator_steps": 6740,
+        "decisions": 338,
+        "qwen_calls": 338,
+        "prompt_tokens": 1365270,
+        "completion_tokens": 49873,
+        "qwen_latency_s": 1176.2,
+        "sam_elapsed_s": 1169.7,
+        "wall_s": 2820.5,
+        "rejected_actions": 26,
+        "initialization_steps": 540,
+        "initialization_wall_s": 33.15
+      }
+    },
+    {
+      "condition": "ee-h2",
+      "label": "H2 \u00b7 relative targets",
+      "n": 9,
+      "successes": 0,
+      "sampled_any_successes": 0,
+      "milestones": {
+        "approach": 1,
+        "contact": 2,
+        "hold": 0,
+        "lift": 0
+      },
+      "paired_against_clean": {
+        "approach": {
+          "gains": 0,
+          "losses": 1
+        },
+        "contact": {
+          "gains": 1,
+          "losses": 1
+        },
+        "hold": {
+          "gains": 0,
+          "losses": 1
+        },
+        "lift": {
+          "gains": 0,
+          "losses": 1
+        }
+      },
+      "costs": {
+        "simulator_steps": 6660,
+        "decisions": 473,
+        "qwen_calls": 473,
+        "prompt_tokens": 1973911,
+        "completion_tokens": 73430,
+        "qwen_latency_s": 1665.0,
+        "sam_elapsed_s": 1314.6,
+        "wall_s": 3646.3,
+        "rejected_actions": 136,
+        "initialization_steps": 0,
+        "initialization_wall_s": 0
+      }
+    },
+    {
+      "condition": "ee-h1",
+      "label": "H1 \u00b7 visual markers",
+      "n": 9,
+      "successes": 0,
+      "sampled_any_successes": 0,
+      "milestones": {
+        "approach": 3,
+        "contact": 3,
+        "hold": 2,
+        "lift": 2
+      },
+      "paired_against_clean": {
+        "approach": {
+          "gains": 1,
+          "losses": 0
+        },
+        "contact": {
+          "gains": 1,
+          "losses": 0
+        },
+        "hold": {
+          "gains": 1,
+          "losses": 0
+        },
+        "lift": {
+          "gains": 1,
+          "losses": 0
+        }
+      },
+      "costs": {
+        "simulator_steps": 7440,
+        "decisions": 437,
+        "qwen_calls": 437,
+        "prompt_tokens": 1869692,
+        "completion_tokens": 64726,
+        "qwen_latency_s": 1519.7,
+        "sam_elapsed_s": 1707.1,
+        "wall_s": 3810.2,
+        "rejected_actions": 64,
+        "initialization_steps": 0,
+        "initialization_wall_s": 0
+      }
+    },
+    {
+      "condition": "ee-h3",
+      "label": "H3 \u00b7 candidate preview",
+      "n": 9,
+      "successes": 0,
+      "sampled_any_successes": 0,
+      "milestones": {
+        "approach": 4,
+        "contact": 2,
+        "hold": 2,
+        "lift": 2
+      },
+      "paired_against_clean": {
+        "approach": {
+          "gains": 4,
+          "losses": 2
+        },
+        "contact": {
+          "gains": 2,
+          "losses": 2
+        },
+        "hold": {
+          "gains": 2,
+          "losses": 1
+        },
+        "lift": {
+          "gains": 2,
+          "losses": 1
+        }
+      },
+      "costs": {
+        "simulator_steps": 7960,
+        "decisions": 413,
+        "qwen_calls": 826,
+        "prompt_tokens": 3878564,
+        "completion_tokens": 191686,
+        "qwen_latency_s": 4309.1,
+        "sam_elapsed_s": 1569.5,
+        "wall_s": 6607.2,
+        "rejected_actions": 8,
+        "initialization_steps": 0,
+        "initialization_wall_s": 0
+      }
+    },
+    {
+      "condition": "ee-h4",
+      "label": "H4 \u00b7 action timing",
+      "n": 9,
+      "successes": 0,
+      "sampled_any_successes": 0,
+      "milestones": {
+        "approach": 1,
+        "contact": 1,
+        "hold": 0,
+        "lift": 0
+      },
+      "paired_against_clean": {
+        "approach": {
+          "gains": 1,
+          "losses": 2
+        },
+        "contact": {
+          "gains": 0,
+          "losses": 1
+        },
+        "hold": {
+          "gains": 0,
+          "losses": 1
+        },
+        "lift": {
+          "gains": 0,
+          "losses": 1
+        }
+      },
+      "costs": {
+        "simulator_steps": 7075,
+        "decisions": 465,
+        "qwen_calls": 465,
+        "prompt_tokens": 1956935,
+        "completion_tokens": 72074,
+        "qwen_latency_s": 1644.6,
+        "sam_elapsed_s": 1975.9,
+        "wall_s": 4146.6,
+        "rejected_actions": 43,
+        "initialization_steps": 0,
+        "initialization_wall_s": 0
+      }
+    },
+    {
+      "condition": "ee-h5",
+      "label": "H5 \u00b7 working memory",
+      "n": 9,
+      "successes": 0,
+      "sampled_any_successes": 0,
+      "milestones": {
+        "approach": 2,
+        "contact": 3,
+        "hold": 2,
+        "lift": 1
+      },
+      "paired_against_clean": {
+        "approach": {
+          "gains": 2,
+          "losses": 2
+        },
+        "contact": {
+          "gains": 2,
+          "losses": 1
+        },
+        "hold": {
+          "gains": 2,
+          "losses": 1
+        },
+        "lift": {
+          "gains": 1,
+          "losses": 1
+        }
+      },
+      "costs": {
+        "simulator_steps": 6760,
+        "decisions": 345,
+        "qwen_calls": 345,
+        "prompt_tokens": 1531678,
+        "completion_tokens": 130028,
+        "qwen_latency_s": 2906.6,
+        "sam_elapsed_s": 1139.3,
+        "wall_s": 4502.1,
+        "rejected_actions": 1,
+        "initialization_steps": 0,
+        "initialization_wall_s": 0
+      }
+    },
+    {
+      "condition": "ee-h6",
+      "label": "H6 \u00b7 failure experience",
+      "n": 9,
+      "successes": 0,
+      "sampled_any_successes": 0,
+      "milestones": {
+        "approach": 4,
+        "contact": 4,
+        "hold": 2,
+        "lift": 2
+      },
+      "paired_against_clean": {
+        "approach": {
+          "gains": 2,
+          "losses": 0
+        },
+        "contact": {
+          "gains": 2,
+          "losses": 0
+        },
+        "hold": {
+          "gains": 1,
+          "losses": 0
+        },
+        "lift": {
+          "gains": 1,
+          "losses": 0
+        }
+      },
+      "costs": {
+        "simulator_steps": 6480,
+        "decisions": 353,
+        "qwen_calls": 353,
+        "prompt_tokens": 1916345,
+        "completion_tokens": 52946,
+        "qwen_latency_s": 1250.7,
+        "sam_elapsed_s": 1439.5,
+        "wall_s": 3160.3,
+        "rejected_actions": 27,
+        "initialization_steps": 0,
+        "initialization_wall_s": 0
+      }
+    },
+    {
+      "condition": "ee-h7",
+      "label": "H7 \u00b7 skill context",
+      "n": 9,
+      "successes": 0,
+      "sampled_any_successes": 1,
+      "milestones": {
+        "approach": 7,
+        "contact": 7,
+        "hold": 6,
+        "lift": 2
+      },
+      "paired_against_clean": {
+        "approach": {
+          "gains": 5,
+          "losses": 0
+        },
+        "contact": {
+          "gains": 5,
+          "losses": 0
+        },
+        "hold": {
+          "gains": 5,
+          "losses": 0
+        },
+        "lift": {
+          "gains": 1,
+          "losses": 0
+        }
+      },
+      "costs": {
+        "simulator_steps": 6520,
+        "decisions": 341,
+        "qwen_calls": 341,
+        "prompt_tokens": 1683595,
+        "completion_tokens": 51206,
+        "qwen_latency_s": 1210.5,
+        "sam_elapsed_s": 1020.6,
+        "wall_s": 2674.7,
+        "rejected_actions": 10,
+        "initialization_steps": 0,
+        "initialization_wall_s": 0
+      }
+    },
+    {
+      "condition": "ee-h8",
+      "label": "H8 \u00b7 expected effects",
+      "n": 9,
+      "successes": 0,
+      "sampled_any_successes": 0,
+      "milestones": {
+        "approach": 5,
+        "contact": 3,
+        "hold": 3,
+        "lift": 3
+      },
+      "paired_against_clean": {
+        "approach": {
+          "gains": 3,
+          "losses": 0
+        },
+        "contact": {
+          "gains": 2,
+          "losses": 1
+        },
+        "hold": {
+          "gains": 2,
+          "losses": 0
+        },
+        "lift": {
+          "gains": 2,
+          "losses": 0
+        }
+      },
+      "costs": {
+        "simulator_steps": 6900,
+        "decisions": 366,
+        "qwen_calls": 366,
+        "prompt_tokens": 1630888,
+        "completion_tokens": 81946,
+        "qwen_latency_s": 1791.2,
+        "sam_elapsed_s": 1283.5,
+        "wall_s": 3566.7,
+        "rejected_actions": 19,
+        "initialization_steps": 0,
+        "initialization_wall_s": 0
+      }
+    }
+  ],
+  "totals": {
+    "simulator_steps": 79375,
+    "decisions": 4328,
+    "qwen_calls": 4741,
+    "prompt_tokens": 21121116,
+    "completion_tokens": 893225,
+    "qwen_latency_s": 20369.4,
+    "sam_elapsed_s": 15123.0,
+    "wall_s": 41501.8,
+    "rejected_actions": 373,
+    "initialization_steps": 540,
+    "initialization_wall_s": 33.15
+  }
+}

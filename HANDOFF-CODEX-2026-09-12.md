@@ -1,5 +1,7 @@
 # Handoff for Codex: direct numerical Qwen control on RoboCasa (2026-09-10 to 2026-09-12)
 
+Historical handoff. The subsequent repairs and completed selective reruns are documented in [the revision handoff](HANDOFF-REVISION-2026-09-12.md), which is the current entry point.
+
 Read in this order: this file, `RUNBOOK.md` (commands, constants, artefact layout), `REPORT.md` (all results, sections 1-12), `docs/superpowers/plans/2026-09-11-show-harness-style-qwen27b.md` (the follow-up plan). Everything below is machine-checked against `result.json` files; nothing is estimated.
 
 ## 1. Goal and setting
