@@ -57,7 +57,7 @@ class H1VisualMarkers(Method):
         return annotated
 
     def _gallery(self, regions, current):
-        rows = regions["regions"][:12]
+        rows = regions["regions"]
         if not rows:
             return None
         columns = 4

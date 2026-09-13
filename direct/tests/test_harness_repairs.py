@@ -13,7 +13,7 @@ import numpy as np
 from PIL import Image
 
 from direct.actions import Action, decode_action
-from direct.harnesses import H4ExecutionTiming, H4Fixed5
+from direct.harnesses import H1VisualMarkers, H4ExecutionTiming, H4Fixed5
 from direct.harnesses_extra import H3ProposePreview, H8ExplicitRecovery
 from direct.kinematics import base_to_world, matrix_to_quat_xyzw, panda_fk
 from direct.methods import make_method
@@ -70,6 +70,21 @@ class HarnessRepairs(unittest.TestCase):
                                              "previous": {"action": {"k": "hold", "g": 0},
                                                           "result": {"status": "partial"}},
                                              "working_memory": {"current_goal": "inspect the previous result"}})}
+
+    def test_h1_gallery_keeps_the_last_of_fourteen_region_crops(self):
+        source = Image.new("RGB", (256, 256), "black")
+        source.paste((255, 0, 0), (200, 200, 220, 220))
+        data = io.BytesIO()
+        source.save(data, format="PNG")
+        regions = [{"id": f"r{i + 1}", "world_m": [0, 0, 0], "mean_rgb": [0, 0, 0],
+                    "views": {"left": {"bbox_xywh": [0, 0, 8, 8], "area_px": 64}}}
+                   for i in range(14)]
+        regions[-1]["views"]["left"] = {"bbox_xywh": [200, 200, 20, 20], "area_px": 400}
+        regions[-1]["mean_rgb"] = [255, 0, 0]
+        method = H1VisualMarkers(run=self.run, config={})
+        gallery = np.asarray(Image.open(io.BytesIO(method._gallery({"regions": regions}, {"left": data.getvalue()}))))
+        red = (gallery[:, :, 0] == 255) & (gallery[:, :, 1] == 0) & (gallery[:, :, 2] == 0)
+        self.assertGreaterEqual(int(red.sum()), 400, "the final proposal's crop must be visible")
 
     def proposal_then_select(self, method, candidates, *, full=False, choice="A", revised=None):
         proposal = {"parsed": {"reasoning": "Keep the candidate gripper ordering intact.", "candidates": candidates},
