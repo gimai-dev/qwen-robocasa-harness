@@ -28,6 +28,8 @@ def run_one(spec: dict, out: Path) -> dict:
         command += ["--interface", spec["interface"], "--mode", spec["mode"], "--method-config", json.dumps(spec.get("method_config", {}))]
         if spec.get("ready_pose"):
             command.append("--ready-pose")
+        if spec.get("scenes"):
+            command += ["--scenes", str(spec["scenes"])]
     for key in ("steps_budget", "wall_budget_s", "max_decisions"):
         if key in spec:
             command += [f"--{key.replace('_', '-')}", str(spec[key])]
@@ -79,11 +81,13 @@ def main() -> int:
     parser.add_argument("--steps-budget", type=int, default=900)
     parser.add_argument("--wall-budget-s", type=float, default=1200.0)
     parser.add_argument("--max-decisions", type=int, default=180)
+    parser.add_argument("--scenes", default=None, help="pinned-scene directory passed to every episode")
     args = parser.parse_args()
     out = Path(args.out).resolve()
     out.mkdir(parents=True, exist_ok=True)
     specs = [{"task": t, "seed": s, "interface": i, "mode": m, "method": h, "method_config": json.loads(args.method_config),
-              "steps_budget": args.steps_budget, "wall_budget_s": args.wall_budget_s, "max_decisions": args.max_decisions}
+              "steps_budget": args.steps_budget, "wall_budget_s": args.wall_budget_s, "max_decisions": args.max_decisions,
+              **({"scenes": args.scenes} if args.scenes else {})}
              for h, m, i, t, s in itertools.product(args.methods, args.modes, args.interfaces, args.tasks, args.seeds)]
     (out / "matrix.json").write_text(json.dumps(specs, indent=1))
     results = []

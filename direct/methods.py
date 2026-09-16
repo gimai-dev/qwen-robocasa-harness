@@ -15,7 +15,7 @@ from pathlib import Path
 
 from .actions import SLOT_STEPS
 
-METHOD_NAMES = ("clean", "h1", "h2", "h3", "h4", "h4c", "h5", "h6", "h7", "h8")
+METHOD_NAMES = ("clean", "h1", "h2", "h3", "h4", "h4c", "h5", "h6", "h7", "h8", "measure")
 
 
 class Method:
@@ -52,6 +52,9 @@ class Method:
 def make_method(name: str, *, run: Path, config: Mapping[str, object]) -> Method:
     if name == "clean":
         return Method(run=run, config=config)
+    if name == "measure":
+        from .measure import MeasureMethod
+        return MeasureMethod(run=run, config=config)
     if "+" in name:
         from .combos import make_combo
         return make_combo(name, run=run, config=config)

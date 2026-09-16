@@ -8,6 +8,8 @@ Compact keys keep a 45-slot full trajectory inside the client's output bound:
   g  gripper command: 0 closed, 1 open (public convention)
   a  base axis: "x" | "y" | "yaw"      v  normalized base velocity in [-0.5, 0.5]
   n  short note
+  measure (opt-in per condition): cam "left"|"right"|"wrist", region [u0, v0, u1, v1] pixels,
+  above_z optional world-z plane; consumes no simulator steps, returns depth statistics
 Every accepted action occupies one control slot of SLOT_STEPS simulator steps
 unless a condition shortens the slot (H4). A rejected action consumes no steps.
 """
@@ -25,7 +27,8 @@ SLOT_STEPS = 20
 MAX_FULL_SLOTS = 45
 BASE_VELOCITY_LIMIT = 0.5
 BASE_MOTION_STEPS = 16          # base velocity is applied for these steps, then braked for the rest of the slot
-KINDS = ("ee", "joint", "base", "hold", "stop")
+KINDS = ("ee", "joint", "base", "hold", "stop", "measure")
+CAMERAS = ("left", "right", "wrist")
 AXES = ("x", "y", "yaw")
 
 
@@ -38,6 +41,9 @@ class Action:
     gripper: int | None = None
     axis: str | None = None
     velocity: float | None = None
+    cam: str | None = None
+    region: tuple[int, int, int, int] | None = None
+    above_z: float | None = None
     note: str = ""
     raw: dict = field(default_factory=dict)
 
@@ -54,6 +60,10 @@ class Action:
         if self.axis is not None:
             out["a"] = self.axis
             out["v"] = self.velocity
+        if self.cam is not None:
+            out["cam"] = self.cam
+            out["region"] = list(self.region)
+            out["above_z"] = self.above_z
         if self.note:
             out["n"] = self.note
         return out
@@ -70,14 +80,25 @@ def _finite_list(value: object, width: int, label: str) -> list[float]:
     return out
 
 
-def action_schema(*, interface: str, allow_stop: bool = True, extra: Mapping[str, object] | None = None) -> dict:
-    """Strict JSON schema for one action; ``interface`` is "ee" or "joint"."""
+def action_schema(*, interface: str, allow_stop: bool = True, extra: Mapping[str, object] | None = None,
+                  measure: bool = False) -> dict:
+    """Strict JSON schema for one action; ``interface`` is "ee" or "joint".
+    ``measure`` adds the depth-measurement action (opt-in condition)."""
     if interface not in ("ee", "joint"):
         raise ValueError("interface must be ee or joint")
-    kinds = [interface, "base", "hold"] + (["stop"] if allow_stop else [])
+    kinds = [interface, "base", "hold"] + (["stop"] if allow_stop else []) + (["measure"] if measure else [])
     number = {"type": "number"}
     nullable_vec = lambda n: {"anyOf": [{"type": "array", "items": number, "minItems": n, "maxItems": n}, {"type": "null"}]}
     properties: dict = {"k": {"type": "string", "enum": kinds}}
+    if measure:
+        # Placed right after "k": the grammar follows the schema's key order and the
+        # model ends its object after "n", so trailing extra keys make it pad with
+        # whitespace instead of closing (seen as a 1,024-token truncation).
+        properties.update({
+            "cam": {"anyOf": [{"type": "string", "enum": list(CAMERAS)}, {"type": "null"}]},
+            "region": nullable_vec(4),
+            "above_z": {"anyOf": [number, {"type": "null"}]},
+        })
     if interface == "ee":
         properties["p"] = nullable_vec(3)
         properties["o"] = nullable_vec(4)
@@ -96,8 +117,9 @@ def action_schema(*, interface: str, allow_stop: bool = True, extra: Mapping[str
 
 
 def short_response_schema(*, interface: str, action_extra: Mapping[str, object] | None = None,
-                          top_extra: Mapping[str, object] | None = None) -> dict:
-    properties = {"reasoning": {"type": "string"}, "action": action_schema(interface=interface, extra=action_extra)}
+                          top_extra: Mapping[str, object] | None = None, measure: bool = False) -> dict:
+    properties = {"reasoning": {"type": "string"},
+                  "action": action_schema(interface=interface, extra=action_extra, measure=measure)}
     if top_extra:
         properties.update(top_extra)
     return {"type": "object", "additionalProperties": False, "properties": properties, "required": list(properties)}
@@ -113,13 +135,14 @@ def full_response_schema(*, interface: str, max_slots: int = MAX_FULL_SLOTS) -> 
 
 def decode_action(value: Mapping[str, object], *, interface: str, representation: str = "absolute",
                   current_tcp_world: Sequence[float] | None = None,
-                  current_q: Sequence[float] | None = None) -> Action:
+                  current_q: Sequence[float] | None = None, measure: bool = False) -> Action:
     """Validate one model action. ``representation`` "relative" (H2) converts
-    displacements / delta-q into absolute targets deterministically."""
+    displacements / delta-q into absolute targets deterministically.
+    ``measure`` accepts the depth-measurement action (opt-in condition)."""
     if not isinstance(value, Mapping):
         raise ValueError("action must be an object")
     kind = value.get("k")
-    if kind not in KINDS:
+    if kind not in KINDS or (kind == "measure" and not measure):
         raise ValueError(f"unknown action kind {kind!r}")
     note = value.get("n", "")
     note = note if isinstance(note, str) else ""
@@ -172,6 +195,20 @@ def decode_action(value: Mapping[str, object], *, interface: str, representation
         return Action("base", axis=str(axis), velocity=velocity, gripper=gripper, note=note, raw=raw)
     if kind == "hold":
         return Action("hold", gripper=gripper, note=note, raw=raw)
+    if kind == "measure":
+        cam = value.get("cam")
+        if cam not in CAMERAS:
+            raise ValueError("measure needs cam in left|right|wrist")
+        region = [int(round(v)) for v in _finite_list(value.get("region"), 4, "region")]
+        u0, v0, u1, v1 = region
+        if not (0 <= u0 < u1 <= 255 and 0 <= v0 < v1 <= 255):
+            raise ValueError("region must be [u0, v0, u1, v1] with 0 <= u0 < u1 <= 255 and 0 <= v0 < v1 <= 255")
+        above_z = value.get("above_z")
+        if above_z is not None:
+            if isinstance(above_z, bool) or not isinstance(above_z, (int, float)) or not math.isfinite(float(above_z)):
+                raise ValueError("above_z must be a finite world z in metres or null")
+            above_z = float(above_z)
+        return Action("measure", cam=str(cam), region=tuple(region), above_z=above_z, note=note, raw=raw)
     return Action("stop", note=note, raw=raw)
 
 

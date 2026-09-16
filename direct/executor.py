@@ -192,6 +192,8 @@ def execute(sim: Simulator, action: Action, *, slot_steps: int = SLOT_STEPS,
         return Receipt("budget_exhausted", action, 0, {"reason": "simulator step budget exhausted"})
     if action.kind == "stop":
         return Receipt("stop", action, 0, {})
+    if action.kind == "measure":
+        return measure(sim, action)
     if action.kind == "ee":
         p_base, r_base = world_to_base(action.position_m, ee_rotation_matrix(action),
                                        state["base_world_position_m"], state["base_world_quat_xyzw"])
@@ -253,6 +255,23 @@ def execute(sim: Simulator, action: Action, *, slot_steps: int = SLOT_STEPS,
     else:
         status = "completed"
     return Receipt(status, action, steps, detail, child)
+
+
+def measure(sim: Simulator, action: Action) -> Receipt:
+    """Render the three cameras with depth at the model's image size (no motion, no
+    steps) and return the depth statistics of the requested pixel region."""
+    from .measure import RENDER_SIZE, measure_from_render
+    target = sim.sim / "measure" / f"{sim.sequence:06d}"
+    observation = sim.send({"kind": "render", "cams": ["left", "right", "wrist"], "width": RENDER_SIZE,
+                            "height": RENDER_SIZE, "depth": True, "dir": str(target)}, timeout_s=120)
+    cameras = observation["execution"]["cameras"]
+    result = measure_from_render(cameras, action.cam, action.region, action.above_z)
+    detail = {"cam": action.cam, "region": list(action.region), "above_z": action.above_z, **result}
+    if result["ok"]:
+        detail["note"] = ("points are the VISIBLE surface seen from this camera: an object's centre is about extent_m[2]/2 "
+                          "below top_point_world_m and near the middle of min/max in x and y; a region that also covers "
+                          "the counter or a far background has a large extent, so tighten the rectangle or set above_z")
+    return Receipt("measured", action, 0, detail)
 
 
 READY_Q = (0.0, -0.35, 0.0, -2.0, 0.0, 1.65, 0.785)

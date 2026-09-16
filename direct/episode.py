@@ -175,7 +175,11 @@ class Episode:
             state = observation["public_state"]
             try:
                 action = decode_action(raw_action, interface=interface, representation=self.method.representation,
-                                       current_tcp_world=state["tcp_world_position_m"], current_q=state["arm_q_rad"])
+                                       current_tcp_world=state["tcp_world_position_m"], current_q=state["arm_q_rad"],
+                                       measure=bool(getattr(self.method, "allow_measure", False)))
+                if action.kind == "measure" and self.method.consecutive_measures >= self.method.max_consecutive_measures:
+                    raise ValueError(f"measure limit: {self.method.max_consecutive_measures} consecutive measurements "
+                                     "without motion; move the robot (or stop) before measuring again")
             except ValueError as error:
                 record.update({"status": "invalid_action", "raw_action": raw_action, "error": str(error)})
                 self.log_decision(record)
@@ -201,6 +205,8 @@ class Episode:
             if receipt.steps > 0:
                 self.previous_images = images
                 self.no_motion_streak = 0
+            elif receipt.status == "measured":
+                pass  # a measurement is neither motion nor a rejected action; the consecutive-measure limit bounds it
             else:
                 self.rejected += 1
                 self.no_motion_streak += 1
@@ -321,7 +327,8 @@ class Episode:
             "slots_executed": sum(d.get("observation_sequence_after", 1) - d.get("observation_sequence", 0) for d in motion_decisions),
             "initialization_steps": sum(d.get("steps", 0) for d in self.decisions if d.get("decision") == 0),
             "initialization_wall_s": round(initialization_wall_s, 2),
-            "rejected_actions": len([d for d in self.decisions if d.get("steps", 0) == 0 and d.get("status") not in (None, "stop")]),
+            "rejected_actions": len([d for d in self.decisions if d.get("steps", 0) == 0 and d.get("status") not in (None, "stop", "measured")]),
+            "measurements": len([d for d in self.decisions if d.get("status") == "measured"]),
             "wall_s": round(time.monotonic() - self.started, 1),
             "control_wall_s": control_wall_s,
             "final_state_wall_s": self.final_state_wall_s,
