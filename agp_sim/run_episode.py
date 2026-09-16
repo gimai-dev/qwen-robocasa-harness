@@ -119,6 +119,7 @@ def main():
     ap.add_argument("--base-url", default="http://127.0.0.1:8002/v1")
     ap.add_argument("--token-file", default="/home/jli/state/panda-qwen38/api-token")
     ap.add_argument("--sim-python", default=SIM_PY)
+    ap.add_argument("--interface", default="full", help="server interface variant: full | joint | path | macro")
     a = ap.parse_args()
 
     out = Path(a.out).resolve()
@@ -138,7 +139,7 @@ def main():
     boot_log = open(out / "server_boot.log", "w")
     server = subprocess.Popen([a.sim_python, str(HERE / "server_sim.py"), "--session", str(session), "--run", str(sim),
                                "--task", a.task, "--seed", str(a.seed), "--scenes", a.scenes, "--budget", str(a.budget),
-                               "--image-size", str(a.image_size)],
+                               "--image-size", str(a.image_size), "--interface", a.interface],
                               stdout=boot_log, stderr=subprocess.STDOUT, env=env, cwd=str(ROOT))
     boot = session / "server_boot.json"
     deadline = time.time() + 900
@@ -157,7 +158,8 @@ def main():
 
     # 2. what the agent sees
     readme = Path(a.readme).read_text().replace("<READY_POSE>", ready_txt).replace("<MAX_OPEN>", f"{info['max_opening_m']:.4f}") \
-        .replace("<IMGSIZE>", f"{info['image_size'][0]}×{info['image_size'][1]}")
+        .replace("<IMGSIZE>", f"{info['image_size'][0]}×{info['image_size'][1]}") \
+        .replace("<READY_JOINTS>", json.dumps(info.get("ready_joints", [])))
     (session / "README_interface.md").write_text(readme)
     prompt = Path(a.prompt).read_text().replace("<INSTRUCTION>", instruction).replace("<BUDGET>", str(a.budget)) \
         .replace("<MINUTES>", str(int(a.wall_min)))
@@ -165,7 +167,7 @@ def main():
     (session / "goal" / "INSTRUCTION.md").write_text(instruction + "\n")
     (out / "episode.json").write_text(json.dumps({"task": a.task, "seed": a.seed, "instruction": instruction, "budget": a.budget,
                                                   "wall_min": a.wall_min, "max_turns": a.max_turns, "temperature": a.temperature,
-                                                  "image_size": a.image_size, "max_images": a.max_images,
+                                                  "image_size": a.image_size, "max_images": a.max_images, "interface": a.interface,
                                                   "prompt_file": a.prompt, "readme_file": a.readme, "started": t_start}, indent=1))
 
     # 3. the agent

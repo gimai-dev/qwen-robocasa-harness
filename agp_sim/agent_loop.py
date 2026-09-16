@@ -192,7 +192,7 @@ class Agent:
                 n_loop += 1
             note = (f"[harness note] You ran the exact same command {n_loop} times in a row; the repeats were removed from your "
                     "context because their answer never changes. Decide from what you already know and take a DIFFERENT action "
-                    "(move_ee / move_delta toward the object, gripper, move_base, or frames).")
+                    "(a move toward the object, gripper, base, or frames).")
         elif len(rc) >= 8:
             kinds = [set(self._ROBOT_CMD.findall(c)) for c in rc]
             n_loop = 0
@@ -205,7 +205,7 @@ class Agent:
                 note = (f"[harness note] Your last {n_loop} tool calls only measured (deproject/state) and were removed from your "
                         "context except the first. You already have the coordinates; measuring again will not change them. "
                         "Write the object position, the destination and your move sequence to scratch/plan.md, then execute "
-                        "the first move_ee now.")
+                        "the first move now.")
             else:
                 n_loop = 0
         if note:
@@ -261,7 +261,7 @@ class Agent:
         lines = list(dict.fromkeys(lines))[-12:]
         return "\n".join(reversed(lines))
 
-    _ACTION_CMDS = {"move_ee", "move_delta", "move_joints", "home", "gripper", "move_base", "frames"}
+    _ACTION_CMDS = {"move_ee", "move_delta", "move_joints", "home", "gripper", "move_base", "frames", "move_path", "grasp_at", "place_at"}
 
     def tool_exec(self, args):
         cmd = str(args.get("command", ""))
@@ -282,7 +282,7 @@ class Agent:
         elif self.require_action:
             self._event("exec_refused", command=cmd)
             return ("[harness] This command was NOT executed. After repeated loops the next tool call must contain a robot action "
-                    "(move_ee, move_delta, move_base, home, gripper) or `frames`. Use the coordinates you already have and act.")
+                    "(a move, gripper or base command from README_interface.md) or `frames`. Use the coordinates you already have and act.")
         if "deproject" in names or "frames" in names:
             self.empty_closes = 0
         timeout = int(args.get("timeout_s") or 300)

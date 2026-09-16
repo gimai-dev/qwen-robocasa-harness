@@ -37,8 +37,18 @@ from direct.executor import READY_Q, Simulator  # noqa: E402
 from direct.kinematics import (JOINT_LIMITS, panda_fk, plan_pose_segment,  # noqa: E402
                                quat_xyzw_to_matrix, solve_pose_multistart)
 
-FREE_CMDS = {"status", "help", "state", "deproject"}
-MOTION_CMDS = {"move_ee", "move_delta", "move_joints", "home", "gripper", "move_base"}
+FREE_CMDS = {"status", "help", "state", "deproject", "fk"}
+MOTION_CMDS = {"move_ee", "move_delta", "move_joints", "home", "gripper", "move_base", "move_path", "grasp_at", "place_at"}
+# interface ablations (2026-09-16): which commands exist. full = the agent-as-policy set; joint = no Cartesian moves
+# (fk instead); path = full + multi-waypoint move_path; macro = full + grasp_at / place_at macros.
+INTERFACES = {
+    "full": {"hidden": set(), "extra": set()},
+    "joint": {"hidden": {"move_ee", "move_delta"}, "extra": {"fk"}},
+    "path": {"hidden": set(), "extra": {"move_path"}},
+    "macro": {"hidden": set(), "extra": {"grasp_at", "place_at"}},
+}
+VARIANT_CMDS = {"fk", "move_path", "grasp_at", "place_at"}
+MAX_PATH_WAYPOINTS = 8
 CAMS = ("left", "right", "wrist")
 SLOT_STEPS = 64
 MAX_SLOTS = 8
@@ -128,6 +138,11 @@ class Server:
         self.budget = int(a.budget)
         self.counted = 0
         self.free_streak = 0
+        self.interface = str(getattr(a, "interface", "full") or "full")
+        if self.interface not in INTERFACES:
+            raise BootError(f"--interface must be one of {sorted(INTERFACES)}")
+        self.hidden = set(INTERFACES[self.interface]["hidden"])
+        self.hidden |= VARIANT_CMDS - INTERFACES[self.interface]["extra"]
         self.r_max, self.z_min, self.z_max, self.max_step = float(a.r_max), float(a.z_min), float(a.z_max), float(a.max_step_m)
         self.capture_seq = itertools.count(1)
         self.img_w, self.img_h = int(a.image_size), int(a.image_size)
@@ -150,7 +165,8 @@ class Server:
                                "dir": str(self.sim.run / "render" / "probe")}, timeout_s=120)["execution"]["cameras"]["wrist"]
         self.img_w, self.img_h = int(probe["width"]), int(probe["height"])   # the offscreen buffer may cap the height
         boot = {"instruction": self.instruction, "ready_pose": self.ready_pose, "max_opening_m": self.max_open,
-                "task": a.task, "seed": int(a.seed), "image_size": [self.img_w, self.img_h]}
+                "task": a.task, "seed": int(a.seed), "image_size": [self.img_w, self.img_h],
+                "ready_joints": [round(float(v), 3) for v in READY_Q], "interface": self.interface}
         (self.session / "server_boot.json").write_text(json.dumps(boot, indent=1, default=_jsonable))
 
     # ---------- infrastructure ----------
@@ -299,7 +315,22 @@ class Server:
                 "max_opening_m": self.max_open, "ready_pose": self.ready_pose, "base_world": self._base_of(st),
                 "sim_steps_used": self.sim.observation.get("steps_used"), "time": time.strftime("%H:%M:%S")}
 
+    EXTRA_HELP = {
+        "fk": '{"joints": [7 floats radians]} -> the tool pose (base frame, tool convention) that joint vector would give, without moving (free)',
+        "move_path": '{"waypoints": [{"position": {...}, "rotation": {...}, "mode": "linear"|"plan", "gripper": "open"|"close"}, ...]} -> executes up to 8 poses in sequence as ONE command (an optional gripper action runs after each pose is reached); stops at the first failure; returns per-waypoint results and the final ee_pose',
+        "grasp_at": '{"position": {"x","y","z"}, "rotation": {"w","x","y","z"}, "approach_height": 0.12, "lift": 0.10} -> macro: open, move above the point, descend straight down onto it, close, lift; returns held, width_m, ee_pose and which step failed',
+        "place_at": '{"position": {"x","y","z"}, "rotation": {"w","x","y","z"}, "approach_height": 0.12, "lift": 0.10} -> macro: move above the point, descend to it, open, lift clear; returns ee_pose and which step failed',
+    }
+
     def cmd_help(self, a):
+        out = self._help_full()
+        cmds = {k: v for k, v in out["commands"].items() if k not in self.hidden}
+        for k in sorted(INTERFACES[self.interface]["extra"]):
+            cmds[k] = self.EXTRA_HELP[k]
+        out["commands"] = cmds
+        return out
+
+    def _help_full(self):
         return {"ok": True, "commands": {
             "status": "server and budget info (free)",
             "help": "this list (free)",
@@ -565,6 +596,84 @@ class Server:
             out["note"] = "the base barely moved: it is probably blocked by furniture in that direction"
         return out
 
+    def cmd_fk(self, a):
+        joints = [float(x) for x in a["joints"]]
+        if len(joints) != 7:
+            return {"ok": False, "error": "joints must have 7 entries (radians)"}
+        bad = [i for i, (v, (lo, hi)) in enumerate(zip(joints, JOINT_LIMITS)) if not lo <= v <= hi]
+        p, R_fk = panda_fk(joints)
+        out = {"ok": True, "ee_pose": _pose(p, R_fk @ M_AGENT), "horizontal_distance_from_base_m": _r4(math.hypot(p[0], p[1]))}
+        if bad:
+            out["joint_limit_violations"] = bad
+        return out
+
+    def cmd_move_path(self, a):
+        t0 = time.time()
+        wps = a.get("waypoints")
+        if not isinstance(wps, list) or not wps:
+            return {"ok": False, "error": 'move_path needs {"waypoints": [ {position, rotation, mode?, gripper?}, ... ]}', "error_code": "INVALID_ARGUMENT"}
+        if len(wps) > MAX_PATH_WAYPOINTS:
+            return {"ok": False, "error": f"at most {MAX_PATH_WAYPOINTS} waypoints per move_path", "error_code": "INVALID_ARGUMENT"}
+        results = []
+        ok_all = True
+        for i, wp in enumerate(wps):
+            r = self.cmd_move_ee({"position": wp["position"], "rotation": wp["rotation"], "mode": wp.get("mode", "linear")})
+            entry = {"waypoint": i, "ok": r.get("ok"), "error_code": r.get("error_code"), "target_error_mm": r.get("target_error_mm")}
+            if r.get("ok") and wp.get("gripper") in ("open", "close"):
+                g = self.cmd_gripper({"action": wp["gripper"]})
+                entry.update({"gripper": wp["gripper"], "held": g.get("held"), "width_m": g.get("width_m")})
+            results.append(entry)
+            if not r.get("ok"):
+                ok_all = False
+                results[-1]["error"] = r.get("error")
+                break
+        return {"ok": ok_all, "completed": sum(1 for e in results if e["ok"]), "requested": len(wps), "results": results,
+                "ee_pose": self._ee_agent(), "gripper_width_m": _r4(self._state_raw()["gripper_width_m"]),
+                "duration_s": round(time.time() - t0, 1)}
+
+    def _macro(self, a, kind):
+        t0 = time.time()
+        p = {k: float(a["position"][k]) for k in "xyz"}
+        rot = {k: float(a["rotation"][k]) for k in "wxyz"} if a.get("rotation") else {"w": 0.0, "x": 1.0, "y": 0.0, "z": 0.0}
+        h = float(a.get("approach_height", 0.12)); lift = float(a.get("lift", 0.10))
+        above = {"x": p["x"], "y": p["y"], "z": p["z"] + h}
+        steps = []
+
+        def step(name, r):
+            steps.append({"step": name, "ok": bool(r.get("ok")), "error_code": r.get("error_code"), "target_error_mm": r.get("target_error_mm")})
+            return bool(r.get("ok"))
+
+        if kind == "grasp":
+            step("open", self.cmd_gripper({"action": "open"}))
+        r = self.cmd_move_ee({"position": above, "rotation": rot, "mode": "linear"})
+        if not r.get("ok"):
+            r = self.cmd_move_ee({"position": above, "rotation": rot, "mode": "plan"})
+        done = step("above", r)
+        if done:
+            done = step("descend", self.cmd_move_ee({"position": p, "rotation": rot, "mode": "linear"}))
+        g = None
+        if done or (steps[-1]["step"] == "descend" and steps[-1]["error_code"] == "SETTLE_MISS"):
+            # a contact stop while descending is normal: the fingers reached the object/surface; act where we stopped
+            g = self.cmd_gripper({"action": "close" if kind == "grasp" else "open"})
+            step("close" if kind == "grasp" else "open", g)
+            cur = self._state_raw()["tcp_base_position_m"]
+            up = {"x": cur[0], "y": cur[1], "z": cur[2] + lift}
+            step("lift", self.cmd_move_ee({"position": up, "rotation": rot, "mode": "linear"}))
+        out = {"ok": all(x["ok"] for x in steps) or (kind == "grasp" and bool(g and g.get("held"))), "macro": kind, "steps": steps,
+               "ee_pose": self._ee_agent(), "duration_s": round(time.time() - t0, 1)}
+        if g is not None:
+            out.update({"held": g.get("held"), "width_m": g.get("width_m")})
+        if kind == "grasp":
+            out["ok"] = bool(g and g.get("held"))
+            out["note"] = ("object held; lifted" if out["ok"] else "grasp EMPTY: re-measure the object and try a different point or orientation")
+        return out
+
+    def cmd_grasp_at(self, a):
+        return self._macro(a, "grasp")
+
+    def cmd_place_at(self, a):
+        return self._macro(a, "place")
+
     def cmd_reset(self, a):
         return {"ok": False, "error_code": "NO_RESET",
                 "error": "reset is not available: recover by re-observing and dealing with the scene as it now is"}
@@ -573,7 +682,7 @@ class Server:
     def dispatch(self, req):
         cmd = req.get("cmd", "")
         fn = getattr(self, f"cmd_{cmd}", None)
-        if fn is None:
+        if fn is None or cmd in self.hidden:
             return {"ok": False, "error": f"unknown command {cmd!r}; run help"}
         if cmd not in FREE_CMDS:
             if self.counted >= self.budget:
@@ -668,6 +777,8 @@ def main():
     ap.add_argument("--z-min", type=float, default=-0.3)
     ap.add_argument("--z-max", type=float, default=1.5)
     ap.add_argument("--max-step-m", type=float, default=0.40)
+    ap.add_argument("--interface", choices=sorted(INTERFACES), default="full",
+                    help="ablation: full (agent-as-policy set) | joint (no Cartesian moves, fk instead) | path (+move_path) | macro (+grasp_at/place_at)")
     a = ap.parse_args()
     try:
         srv = Server(a)
