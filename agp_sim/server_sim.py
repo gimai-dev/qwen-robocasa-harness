@@ -616,9 +616,11 @@ class Server:
         out = {"ok": True, "horizontal_distance_from_base_m": _r4(math.hypot(p[0], p[1])),
                "distance_from_current_m": _r4(float(np.linalg.norm(np.asarray(p) - np.asarray(cur))))}
         bad = self._clamp(p, cur)
-        if bad:
+        if bad and "step" not in bad:          # the per-move step limit is not a reachability property
             out.update({"reachable": False, "reason": "CLAMP: " + bad})
             return out
+        if bad:
+            out["note"] = "farther than one move's 0.40 m step from the current pose: split the move; reachability below ignores the step"
         q = self._q()
         plan = plan_pose_segment(q, np.asarray(p), R_fk)
         direct = solve_pose_multistart(q, np.asarray(p), R_fk)
