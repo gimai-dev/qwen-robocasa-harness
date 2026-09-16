@@ -37,7 +37,7 @@ from direct.executor import READY_Q, Simulator  # noqa: E402
 from direct.kinematics import (JOINT_LIMITS, panda_fk, plan_pose_segment,  # noqa: E402
                                quat_xyzw_to_matrix, solve_pose_multistart)
 
-FREE_CMDS = {"status", "help", "state", "deproject", "fk"}
+FREE_CMDS = {"status", "help", "state", "deproject", "fk", "check_pose"}
 MOTION_CMDS = {"move_ee", "move_delta", "move_joints", "home", "gripper", "move_base", "move_path", "grasp_at", "place_at"}
 # interface ablations (2026-09-16): which commands exist. full = the agent-as-policy set; joint = no Cartesian moves
 # (fk instead); path = full + multi-waypoint move_path; macro = full + grasp_at / place_at macros.
@@ -138,6 +138,7 @@ class Server:
         self.budget = int(a.budget)
         self.counted = 0
         self.free_streak = 0
+        self.carrying = False          # a close reported held=true and the gripper has not been opened since
         self.interface = str(getattr(a, "interface", "full") or "full")
         if self.interface not in INTERFACES:
             raise BootError(f"--interface must be one of {sorted(INTERFACES)}")
@@ -288,6 +289,14 @@ class Server:
         out = {"ok": False, "error": None, "move": label, "ee_pose": ee, "target_error_mm": d_mm,
                "duration_s": round(time.time() - t0, 1), "joints": [_r4(v) for v in st["arm_q_rad"]],
                "gripper_width_m": _r4(st["gripper_width_m"])}
+        if self.carrying:
+            if float(st["gripper_width_m"]) < HELD_MIN_WIDTH_M:
+                self.carrying = False
+                out["dropped"] = True
+                out["carry_note"] = (f"the gripper width fell to {float(st['gripper_width_m']) * 1000:.0f} mm during this move: the object was "
+                                     "DROPPED. Take frames, find where it landed, and grasp it again")
+            else:
+                out["carrying"] = True
         if err:
             out.update(err)
             return out
@@ -341,6 +350,7 @@ class Server:
             "move_ee": '{"position": {"x","y","z"}, "rotation": {"w","x","y","z"}, "mode": "linear"|"plan"} -> straight line holding orientation (default) or joint-space move to the IK solution; returns achieved ee_pose + target_error_mm; ok:false + error_code (CLAMP / IK_FAILED / SETTLE_MISS) if refused or not reached',
             "move_delta": '{"dpos": [dx,dy,dz], "drot_deg": [rx,ry,rz]} (either optional) -> relative straight-line move from the current pose; rotation deltas about the BASE axes',
             "move_joints": '{"joints": [7 floats radians]} -> joint-space move',
+            "check_pose": '{"position": {"x","y","z"}, "rotation": {"w","x","y","z"}} -> tests a target WITHOUT moving: clamp, IK reachability from the current joints, residual, horizontal distance from the base (free)',
             "home": "{} -> the ready/observe posture (arm raised over the workspace, wrist camera looking forward-down)",
             "gripper": '{"action": "open"|"close"} -> returns fraction (0 closed .. 1 open) and width_m; close stops on the object, so a clearly nonzero fraction after close means something is held',
             "move_base": '{"axis": "x"|"y"|"yaw", "distance": <m or rad>} -> drives the mobile base: x forward along its heading, y to its left, yaw counter-clockwise; |distance| <= 0.5 m / 1.0 rad per call; the arm holds its joints; returns base_world before/after',
@@ -548,10 +558,12 @@ class Server:
         if g == 0.0:
             held = width >= HELD_MIN_WIDTH_M
             out["held"] = held
+            self.carrying = held
             out["note"] = (f"closed on something {width * 1000:.0f} mm wide: an object is between the pads" if held else
                            f"the pads closed to {width * 1000:.0f} mm: the grasp is EMPTY (nothing between the fingers). The fingers STAY CLOSED "
                            "until you send gripper open, so open them before the next approach or they will only poke the object; re-observe and re-aim")
         else:
+            self.carrying = False
             out["note"] = "gripper open" if frac > 0.9 else f"the gripper opened only to {width * 1000:.0f} mm: something is blocking the fingers"
         return out
 
@@ -594,6 +606,31 @@ class Server:
                "steps": steps, "duration_s": round(time.time() - t0, 1), "ee_pose": self._ee_agent(st)}
         if axis != "yaw" and math.hypot(*moved[:2]) < min(0.02, abs(dist) * 0.2):
             out["note"] = "the base barely moved: it is probably blocked by furniture in that direction"
+        return out
+
+    def cmd_check_pose(self, a):
+        p = [float(a["position"][k]) for k in "xyz"]
+        R_agent = _wxyz_to_mat([float(a["rotation"][k]) for k in "wxyz"])
+        R_fk = R_agent @ M_AGENT.T
+        cur = self._state_raw()["tcp_base_position_m"]
+        out = {"ok": True, "horizontal_distance_from_base_m": _r4(math.hypot(p[0], p[1])),
+               "distance_from_current_m": _r4(float(np.linalg.norm(np.asarray(p) - np.asarray(cur))))}
+        bad = self._clamp(p, cur)
+        if bad:
+            out.update({"reachable": False, "reason": "CLAMP: " + bad})
+            return out
+        q = self._q()
+        plan = plan_pose_segment(q, np.asarray(p), R_fk)
+        direct = solve_pose_multistart(q, np.asarray(p), R_fk)
+        straight = plan["status"] == "kinematically_reachable"
+        reach = straight or direct["status"] == "kinematically_reachable"
+        out.update({"reachable": bool(reach), "straight_line_ok": bool(straight),
+                    "ik_residual_mm": _r4(direct["position_error_m"] * 1000),
+                    "max_joint_change_rad": _r4(direct.get("max_joint_delta_rad", 0.0))})
+        if not reach:
+            out["reason"] = "IK_FAILED: no joint solution within limits; try a target closer to the base (0.35-0.65 m), higher, or move the base"
+        elif not straight:
+            out["reason"] = "reachable by a joint-space move only (mode \"plan\"); the straight line passes through a joint-limit/branch change"
         return out
 
     def cmd_fk(self, a):

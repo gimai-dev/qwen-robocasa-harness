@@ -52,7 +52,11 @@ python3 robot_client.py . <command> ['<json-args>']
    move sequence (approach above the object, descend to its centre height,
    close, verify `held` and lift, carry, lower, open, withdraw) to
    `scratch/plan.md`, then execute it. Re-measure only after something has
-   moved. Repeating a measurement does not change it.
+   moved. Repeating a measurement does not change it. `check_pose` is free:
+   test a target with it before moving when you are unsure it is reachable.
+7. After ANY failed move (`SETTLE_MISS`, `IK_FAILED`, `CLAMP`), look before
+   you act again: take `frames`, view the wrist image, and pick a clearly
+   different target. Never retry the same target with millimetre changes.
 
 ## Deliverable
 

@@ -100,7 +100,7 @@ def parse_inline_tool_calls(text: str) -> list[dict]:
 class Agent:
     def __init__(self, session: Path, base_url: str, token: str, model: str, *, max_turns: int, wall_s: float,
                  temperature: float = 0.2, max_images: int = MAX_IMAGES, ctx_soft: int = CTX_SOFT, python_bin: str | None = None,
-                 log_dir: Path | None = None):
+                 log_dir: Path | None = None, thinking: bool = False):
         self.session = session.resolve()
         # harness files live OUTSIDE the session so the agent cannot read its own event log
         self.log_dir = (log_dir or self.session.parent).resolve()
@@ -110,6 +110,7 @@ class Agent:
         self.max_turns, self.wall_s, self.temperature = max_turns, wall_s, temperature
         self.max_images, self.ctx_soft = max_images, ctx_soft
         self.events = open(self.log_dir / "agent_events.jsonl", "a")
+        self.thinking = bool(thinking)
         self.consecutive_nudges = 0
         self.require_action = False
         self.required_cmds: set | None = None      # when set, the next exec must contain one of these robot commands
@@ -151,12 +152,12 @@ class Agent:
         context reinforce them), so the looping exchanges are also removed from the context, keeping one."""
         rc = self.recent_cmds
         note, n_loop = None, 0
-        if self.failed_moves >= 6:
+        if self.failed_moves >= 2:
             self.failed_moves = 0
-            self.required_cmds = {"frames", "home"}
-            self.required_msg = ("Six motion commands in a row failed (SETTLE_MISS / IK_FAILED / CLAMP): nudging the target by a few "
-                                 "millimetres will keep failing. Go back to `home` or take `frames`, re-measure, and choose a clearly "
-                                 "different target: farther from the base (0.35-0.65 m), a different height, or drive the base.")
+            self.required_cmds = {"frames", "home", "check_pose"}
+            self.required_msg = ("Two motion commands in a row failed (SETTLE_MISS / IK_FAILED / CLAMP). Do not nudge the target again: "
+                                 "take `frames` and look, or test candidates with the free `check_pose`, or go `home`; then choose a "
+                                 "clearly different target (a different height, farther from the base, or move the base first).")
             self.consecutive_nudges += 1
             self._event("nudge", note="failed-moves rule")
             return "[harness note] " + self.required_msg
@@ -400,9 +401,9 @@ class Agent:
     # ---------- model ----------
     def _request(self):
         body = {"model": self.model, "messages": self._wire(), "tools": TOOLS, "tool_choice": "auto",
-                "max_tokens": MAX_TOKENS, "temperature": self.temperature, "top_p": 0.95,
+                "max_tokens": (MAX_TOKENS * 3 if self.thinking else MAX_TOKENS), "temperature": self.temperature, "top_p": 0.95,
                 "presence_penalty": 0.3, "repetition_penalty": 1.05,
-                "chat_template_kwargs": {"enable_thinking": False}}
+                "chat_template_kwargs": {"enable_thinking": self.thinking}}
         data = json.dumps(body).encode()
         req = urllib.request.Request(self.base_url + "/chat/completions", data=data,
                                      headers={"Authorization": f"Bearer {self.token}", "Content-Type": "application/json"})
@@ -440,6 +441,14 @@ class Agent:
         self.usage["latency_s"] += dt
         choice = resp["choices"][0]
         msg = choice["message"]
+        reasoning = msg.get("reasoning_content") or msg.get("reasoning") or ""
+        if msg.get("content") and "</think>" in msg["content"]:
+            # no reasoning parser on the server: the template opens <think>, the model closes it
+            head, _, tail = msg["content"].partition("</think>")
+            reasoning = (reasoning + head.replace("<think>", "")).strip()
+            msg["content"] = tail.strip()
+        if reasoning:
+            self._event("reasoning", text=reasoning[:1500], chars=len(reasoning))
         if not msg.get("tool_calls") and msg.get("content") and "<tool_call>" in msg["content"]:
             parsed = parse_inline_tool_calls(msg["content"])
             if parsed:
@@ -531,6 +540,7 @@ def main():
     ap.add_argument("--temperature", type=float, default=0.2)
     ap.add_argument("--max-images", type=int, default=MAX_IMAGES)
     ap.add_argument("--python-bin", default=None, help="interpreter exposed as python3 inside the session (numpy/PIL/scipy/cv2)")
+    ap.add_argument("--thinking", action="store_true", help="enable Qwen thinking (reasoning is logged, not shown to the tools)")
     a = ap.parse_args()
     session = Path(a.session)
     token = Path(a.token_file).read_text().strip()
@@ -540,7 +550,7 @@ def main():
         with urllib.request.urlopen(req, timeout=30) as r:
             model = json.loads(r.read())["data"][0]["id"]
     agent = Agent(session, a.base_url, token, model, max_turns=a.max_turns, wall_s=a.wall_min * 60,
-                  temperature=a.temperature, max_images=a.max_images, python_bin=a.python_bin)
+                  temperature=a.temperature, max_images=a.max_images, python_bin=a.python_bin, thinking=a.thinking)
     prompt = (session / a.prompt).read_text()
     outcome = agent.run(prompt)
     print(json.dumps({"outcome": outcome, **agent.usage}))

@@ -99,6 +99,10 @@ reg = rc("deproject", {"capture": fr["capture"], "cam": "wrist", "region": [200,
 if not reg["ok"]: fails.append("region deproject")
 reg2 = rc("deproject", {"capture": fr["capture"], "cam": "left", "region": [0, 0, 511, 479], "above_z": 0.25})
 d = np.load(fr["files"]["wrist"]["depth_npy"]); print(f"  wrist depth: shape {d.shape} min {np.nanmin(d[d>0]):.3f} max {np.nanmax(d[np.isfinite(d)]):.3f}")
+cp = rc("check_pose", {"position": {"x": 0.45, "y": 0.0, "z": 0.40}, "rotation": {"w": 0, "x": 1, "y": 0, "z": 0}})
+if not cp.get("reachable"): fails.append(f"check_pose reachable: {cp}")
+cp = rc("check_pose", {"position": {"x": 0.9, "y": 0.0, "z": 0.60}, "rotation": {"w": 0, "x": 1, "y": 0, "z": 0}})
+if cp.get("reachable"): fails.append(f"check_pose far target should be unreachable: {cp}")
 # motion
 m1 = rc("move_delta", {"dpos": [0.05, 0, 0]})
 if not m1["ok"]: fails.append("move_delta +x")
