@@ -35,7 +35,7 @@ def classify(run: Path) -> dict:
         signal.append(f"SETTLE_MISS x{errs['SETTLE_MISS']}")
     if errs.get("CLAMP", 0) >= 2:
         signal.append(f"CLAMP x{errs['CLAMP']}")
-    if cmds.get("gripper", 0) == 0:
+    if cmds.get("gripper", 0) + cmds.get("grasp_at", 0) + cmds.get("move_path", 0) == 0:
         signal.append("never closed gripper")
     if nudges:
         signal.append(f"loop nudges x{nudges}")
@@ -44,7 +44,7 @@ def classify(run: Path) -> dict:
     if cmds.get("move_base", 0) >= 3:
         signal.append(f"move_base x{cmds['move_base']}")
     return {"run": run.name, "task": r["task"], "seed": r["seed"], "stage": stage, "agent": r["agent_verdict"],
-            "min_dist": m.get("min_gripper_obj_distance_m"), "cmds": r["cmds_counted"], "moves": cmds.get("move_ee", 0) + cmds.get("move_delta", 0),
+            "min_dist": m.get("min_gripper_obj_distance_m"), "cmds": r["cmds_counted"], "moves": cmds.get("move_ee", 0) + cmds.get("move_delta", 0) + cmds.get("move_joints", 0) + cmds.get("move_path", 0) + cmds.get("grasp_at", 0) + cmds.get("place_at", 0),
             "frames": cmds.get("frames", 0), "turns": u.get("turns"), "wall_min": round(r["wall_s"] / 60, 1), "signals": "; ".join(signal)}
 
 

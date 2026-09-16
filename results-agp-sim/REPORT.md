@@ -138,6 +138,41 @@ The vLLM on h200-2 (port 8002, same model id and token as before) was restarted 
 12-image limit; `/home/jli/state/agp-sim/start_qwen_agp.sh` relaunches it, `qwen-original-cmdline.txt` next
 to it holds the previous command line.
 
+## Interface ablations (2026-09-16 afternoon, same 9 dev starts, v6 loop guards everywhere)
+
+Three variants of the command set, everything else identical to v6 (`server_sim.py --interface`,
+`README_interface_{joint,path,macro}.md`, `PROMPT_robocasa_{joint,path,macro}.md`):
+
+| interface | what changes | official | approach | contact | lift | median min (successes) |
+|---|---|---|---|---|---|---|
+| full (v6 baseline, dev6) | `move_ee` / `move_delta` one pose per command | **4/9** | 9/9 | 9/9 | 7/9 | 8 |
+| joint | no Cartesian move; `move_joints` only, free `fk` to preview | 0/9 | 2/9 | 2/9 | 1/9 | — |
+| path | full + `move_path` (up to 8 poses + gripper actions as one command) | 2/9 | 5/9 | 5/9 | 4/9 | 10 |
+| macro | full + `grasp_at` / `place_at` (open–above–descend–close–lift as one command) | 3/9 | 3/9 | 3/9 | 3/9 | 12 |
+
+Per-episode tables: `h200-2:/home/jli/state/agp-sim/matrix/abl-{joint,path,macro}/classify.md`.
+
+Reading:
+- **Joint space is out of reach for this model.** With `fk` available it still never got within 10 cm in
+  7 of 9 starts; the one lift (CounterToSink seed 0) took 89 commands and never placed. Three episodes
+  spent the whole 45 minutes on 1–3 commands: the model wrote joint vectors, previewed them with `fk`, and
+  looped without moving. The Cartesian interface is doing real work, not just saving tokens.
+- **Longer trajectories do not help and slightly hurt.** `move_path` episodes that succeeded were short
+  (9–11 commands, 9.5–9.8 min) because one command did approach–descend–close–lift, but the failures
+  were of a new kind: the model composed a whole sequence from one measurement, the sequence stopped at
+  its first failure, and the model then re-issued long sequences instead of re-observing (Stove seed 1:
+  51 SETTLE_MISS). Approach fell from 9/9 to 5/9.
+- **Macros move the failure, they do not remove it.** `grasp_at` succeeded whenever the approach pose was
+  reachable (3 successes in 9–15 min), but in six starts the macro's first step ("above the point") hit
+  the stove hood or the counter edge (`SETTLE_MISS` at 240 N) and the model could not recover the arm from
+  the wedged configuration; the macro hides exactly the step where the model needed to look and adjust.
+  Approach fell from 9/9 to 3/9.
+
+Net: on this model, the plain one-pose-per-command Cartesian interface remains the best of the four; the
+gains from chunking motion into longer commands are eaten by the loss of per-step observation. Counts
+are 0–4 out of 9, so only the joint-space result (0/9 with 2/9 approach against 9/9) is clearly
+separated from the baseline.
+
 ## Limitations
 
 - Qwen3.8-27B needs harness-level loop breaking that frontier coding agents do not; those guards
