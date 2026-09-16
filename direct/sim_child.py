@@ -33,7 +33,7 @@ from .kinematics import JOINT_LIMITS, MAX_JOINT_STEP, panda_fk, matrix_to_quat_x
 
 DEFAULT_ACTION_BUDGET = 900
 DEFAULT_WALL_BUDGET_S = 1200.0
-MAX_ACTION_BUDGET = 3000
+MAX_ACTION_BUDGET = 30000   # agent-as-policy sessions run thousands of slot steps
 TRACKING_LAG_PAUSE = 0.10
 VIDEO_EVERY = 4
 BASE_VELOCITY_LIMIT = 0.5
@@ -271,6 +271,26 @@ def _save_video_frame(raw: Mapping[str, object], video_dir: Path, index: int, ca
     mosaic.save(video_dir / f"{index:06d}.png", format="PNG")
 
 
+def _evaluator_view(environment: object) -> dict[str, object]:
+    """Ground truth the agent never sees: target object pose, gripper-object distance, contact, success."""
+    import numpy as np
+    env = environment.unwrapped
+    out: dict[str, object] = {}
+    try:
+        out["official_success"] = bool(env._check_success())
+    except Exception as error:  # noqa: BLE001
+        out["official_success_error"] = repr(error)
+    try:
+        obj_id = env.obj_body_id["obj"]
+        obj = np.asarray(env.sim.data.body_xpos[obj_id], dtype=float)
+        site = np.asarray(env.sim.data.site_xpos[env.robots[0].eef_site_id["right"]], dtype=float)
+        out.update({"obj_world_m": obj.tolist(), "gripper_obj_distance_m": float(np.linalg.norm(site - obj)),
+                    "gripper_touching_obj": bool(env.check_contact(env.robots[0].gripper["right"], env.objects["obj"]))})
+    except Exception as error:  # noqa: BLE001
+        out["object_error"] = repr(error)
+    return out
+
+
 class Child:
     def __init__(self, task: str, seed: int, run: Path, scenes: Path, *, action_budget: int, wall_budget_s: float) -> None:
         self.task, self.seed, self.run, self.scenes = task, seed, run, scenes
@@ -426,6 +446,7 @@ class Child:
         state["unloaded_wrist_weight_n"] = self.unloaded_wrist_weight
         calibration = state.pop("camera_calibration")
         images = _save_images(raw, self.run / "frames" / f"{sequence:06d}")
+        evaluator = _evaluator_view(environment)
         instruction = raw.get("annotation.human.task_description")
         record = {
             "schema": SCHEMA, "task": self.task, "seed": self.seed, "sequence": sequence,
@@ -433,6 +454,7 @@ class Child:
                                                         sort_keys=True, default=_default).encode()).hexdigest()[:24],
             "instruction": instruction, "images": images, "public_state": state,
             "camera_calibration": calibration,
+            "evaluator": evaluator,
             "steps_used": self.total_steps, "steps_budget": self.action_budget,
             "wall_used_s": time.monotonic() - self.started, "wall_budget_s": self.wall_budget_s,
             "gripper_command": self.gripper_open,
@@ -442,6 +464,49 @@ class Child:
         _atomic_json(self.run / "mailbox" / f"observation-{sequence:06d}.json", record)
         self.snapshot(environment, self.run / "snapshots" / f"{sequence:06d}.json")
         return record
+
+    def render(self, environment: object, command: Mapping[str, object]) -> dict[str, object]:
+        """RGB + metric depth for the requested cameras at the requested size, plus pinhole
+        calibration in the world frame (MuJoCo camera convention: x right, y up, -z forward)."""
+        import numpy as np
+        from PIL import Image
+        from robosuite.utils.camera_utils import get_real_depth_map
+        env = environment.unwrapped
+        sim = env.sim
+        names = {"left": "robot0_agentview_left", "right": "robot0_agentview_right", "wrist": "robot0_eye_in_hand"}
+        width = int(command.get("width", 512))
+        height = int(command.get("height", 512))
+        # the offscreen framebuffer is sized by the model; never ask for more than it holds
+        width = min(width, int(sim.model.vis.global_.offwidth))
+        height = min(height, int(sim.model.vis.global_.offheight))
+        target = Path(command["dir"])
+        target.mkdir(parents=True, exist_ok=True)
+        want_depth = bool(command.get("depth", True))
+        out: dict[str, object] = {}
+        for label in command["cams"]:
+            name = names[label]
+            if want_depth:
+                rgb, depth = sim.render(width=width, height=height, camera_name=name, depth=True)
+                depth = get_real_depth_map(sim, np.asarray(depth)[::-1]).astype(np.float32)
+            else:
+                rgb, depth = sim.render(width=width, height=height, camera_name=name, depth=False), None
+            rgb = np.asarray(rgb, dtype=np.uint8)[::-1]
+            Image.fromarray(np.ascontiguousarray(rgb[..., :3])).save(target / f"{label}.png", format="PNG")
+            entry: dict[str, object] = {"rgb": str(target / f"{label}.png")}
+            if depth is not None:
+                np.save(target / f"{label}_depth.npy", depth)
+                entry["depth_npy"] = str(target / f"{label}_depth.npy")
+            cam_id = sim.model.camera_name2id(name)
+            fovy = float(sim.model.cam_fovy[cam_id])
+            focal = 0.5 * height / np.tan(np.deg2rad(fovy) / 2.0)
+            entry.update({
+                "width": width, "height": height, "fx": float(focal), "fy": float(focal),
+                "cx": (width - 1.0) / 2.0, "cy": (height - 1.0) / 2.0,
+                "camera_position_world_m": np.asarray(sim.data.cam_xpos[cam_id], dtype=float).tolist(),
+                "camera_xmat_world": np.asarray(sim.data.cam_xmat[cam_id], dtype=float).reshape(3, 3).tolist(),
+            })
+            out[label] = entry
+        return {"kind": "render", "accepted": True, "cameras": out}
 
     def snapshot(self, environment: object, path: Path) -> dict[str, object]:
         env = environment.unwrapped
@@ -551,6 +616,8 @@ def run(task: str, seed: int, run: Path, scenes: Path, *, action_budget: int, wa
                 raw, receipt = child.execute_base(environment, command, chassis, raw)
             elif kind == "snapshot":
                 receipt = child.snapshot(environment, Path(command["path"]))
+            elif kind == "render":
+                receipt = child.render(environment, command)
             elif kind == "inspect":
                 receipt = child.inspect(environment, Path(command["path"]))
                 raw = environment.unwrapped.get_observation(environment.unwrapped._get_observations(force_update=True))

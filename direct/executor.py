@@ -21,7 +21,16 @@ from .kinematics import plan_pose_segment, solve_pose_multistart, world_to_base
 
 SIM_ROOT = Path("/home/jli/work/robocasa-inspect-official")
 SIM_STATE = Path("/home/jli/state/robocasa-inspect-official")
-EGL_ROOTFS = SIM_STATE / "nvidia-egl-580.173.02/rootfs"
+def _egl_rootfs() -> Path:
+    """The NVIDIA EGL userspace rootfs under SIM_STATE; its driver version differs per box."""
+    override = os.environ.get("AGP_EGL_ROOTFS")
+    if override:
+        return Path(override)
+    found = sorted(SIM_STATE.glob("nvidia-egl-*/rootfs"))
+    return found[-1] if found else SIM_STATE / "nvidia-egl-580.173.02/rootfs"
+
+
+EGL_ROOTFS = _egl_rootfs()
 RELEASE_ROOT = Path(__file__).resolve().parents[1]
 COMMAND_SCHEMA = "qwen-direct-command/v1"
 
@@ -131,7 +140,7 @@ class Simulator:
 
     def send(self, command: Mapping[str, object], *, timeout_s: float = 300) -> dict:
         payload = {"schema": COMMAND_SCHEMA, "sequence": self.sequence, **command}
-        if command["kind"] in ("slot", "base", "snapshot", "inspect"):
+        if command["kind"] in ("slot", "base", "snapshot", "inspect", "render"):
             payload["observation_id"] = self.observation["observation_id"]
         _atomic_json(self.sim / "mailbox" / f"command-{self.sequence:06d}.json", payload)
         if command["kind"] in ("finish", "close"):
