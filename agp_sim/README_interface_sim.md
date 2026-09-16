@@ -41,6 +41,16 @@ times out, check server liveness with `tail -3 server.log` and retry once.
   sits 0.33 m above the base origin); targets farther than ~0.7 m
   horizontally from the base usually need the base to drive closer
   (`move_base`).
+- Depth gives the VISIBLE surface, not the centre: a single pixel on a
+  rounded object returns a point on its near/top surface, several
+  centimetres away from the centre. Measure a whole region (see
+  `deproject` region form) or reason with the object's size.
+- Grasping: the fingers open at most <MAX_OPEN> m, so an object must be
+  grasped along a dimension smaller than that, with the grasp point at
+  the object's centre height. Rotate the tool about its own z axis (a
+  `move_delta` with `drot_deg` about base z while pointing down) to align
+  the finger closing direction (tool y) with the object's narrow axis, and
+  approach from straight above so the fingers straddle it before closing.
 - If a move's path completes but the arm cannot settle onto the target within
   tolerance (typically the fingers or the held object are pressing against
   something, or the target is inside a surface), the response is `ok:false`
@@ -58,11 +68,12 @@ times out, check server liveness with `tail -3 server.log` and retry once.
 | `state` | — | joints (7, rad), ee_pose, gripper_fraction, gripper_width_m, base_world, contact_force_n (free) |
 | `frames` | `{"cams":["left","right","wrist"],"depth":true}` (both optional) | captures the cameras from the same instant; saves `frames/NNNN_<cam>.png`, `frames/NNNN_<cam>_depth.npy` (float32 metres), `frames/NNNN_calib.json`; returns the paths |
 | `deproject` | `{"capture":N,"cam":"wrist","u":<px>,"v":<px>}` | 3D point (base frame) of that pixel using the saved depth (5×5 median) (free). Add `"plane_z":<m>` to intersect the pixel ray with the horizontal plane z = plane_z instead of using depth |
+| `deproject` (region) | `{"capture":N,"cam":"wrist","region":[u0,v0,u1,v1],"above_z":<m>}` | 3D statistics of ALL surface points inside that pixel rectangle that lie above the plane z = above_z (use the counter height to drop the counter): `centroid_base`, `min_base`/`max_base`, `extent_m`, `top_point_base`, `n_points` (free). This is how to measure an object's centre and size: draw the rectangle around the object in the image, give the counter height as `above_z`, grasp at the middle of min/max in x,y and at `top_point_base.z − extent_m.z/2` |
 | `move_ee` | `{"position":{"x","y","z"},"rotation":{"w","x","y","z"},"mode":"linear"\|"plan"}` | `linear` = straight Cartesian line holding orientation (default); `plan` = joint-space move to the IK solution. Returns achieved `ee_pose`, `target_error_mm`, and `ok:false` + error if the move was refused or failed (arm stays where it stopped) |
 | `move_delta` | `{"dpos":[dx,dy,dz],"drot_deg":[rx,ry,rz]}` (either optional) | relative straight-line move from the current pose; rotation deltas about the BASE axes, applied before the current rotation |
 | `move_joints` | `{"joints":[7 floats]}` | joint-space move (radians) |
 | `home` | — | move to the READY posture (arm raised, wrist camera looking forward and down over the workspace) |
-| `gripper` | `{"action":"open"\|"close"}` | returns `fraction` (0 closed … 1 open) and `width_m`. `close` stops on the object: a clearly nonzero fraction after `close` means something is held between the pads; ≈0 means the grasp is empty |
+| `gripper` | `{"action":"open"\|"close"}` | returns `fraction` (0 closed … 1 open), `width_m` and, after `close`, `held` (true only when the pads stopped on an object at least 12 mm wide). `held: false` means the grasp is EMPTY, whatever the images look like: re-observe and re-aim |
 | `move_base` | `{"axis":"x"\|"y"\|"yaw","distance":<m or rad>}` | drives the mobile base: `x` forward along its heading, `y` to its left, `yaw` counter-clockwise; at most 0.5 m / 1.0 rad per call; the arm keeps its joint angles (so the tool moves with the base). Returns `base_world` before/after and the distance actually moved; a note tells you when furniture blocked it |
 
 ## Cameras

@@ -44,6 +44,8 @@ SLOT_STEPS = 64
 MAX_SLOTS = 8
 SETTLE_TOL_RAD = 0.03
 CONTACT_FORCE_N = 15.0
+MEASURE_LIMIT = 24            # free deproject calls allowed between two counted commands
+HELD_MIN_WIDTH_M = 0.012      # an empty Panda close ends at ~1-7 mm in this sim; objects here are >= 2 cm
 BASE_VELOCITY = 0.5
 BASE_STEP_M = 0.048          # measured displacement of one 20-step base slot at v=0.5 (smoke_child)
 BASE_STEP_RAD = 0.355
@@ -125,6 +127,7 @@ class Server:
         self.evaluator_path = self.session.parent / "evaluator.jsonl"
         self.budget = int(a.budget)
         self.counted = 0
+        self.free_streak = 0
         self.r_max, self.z_min, self.z_max, self.max_step = float(a.r_max), float(a.z_min), float(a.z_max), float(a.max_step_m)
         self.capture_seq = itertools.count(1)
         self.img_w, self.img_h = int(a.image_size), int(a.image_size)
@@ -302,7 +305,8 @@ class Server:
             "help": "this list (free)",
             "state": "{} -> joints (7, rad), ee_pose (base frame, tool convention), gripper_fraction, gripper_width_m, base_world, contact_force_n (free)",
             "frames": '{"cams": ["left","right","wrist"], "depth": true} (both optional) -> captures the cameras from one instant; saves frames/NNNN_<cam>.png, frames/NNNN_<cam>_depth.npy (float32 metres) and frames/NNNN_calib.json; returns the paths',
-            "deproject": '{"capture": N, "cam": "wrist", "u": px, "v": px} -> 3D point (base frame) from the saved depth (5x5 median); add "plane_z": <m> to intersect the pixel ray with the horizontal plane z = plane_z instead (free)',
+            "deproject": '{"capture": N, "cam": "wrist", "u": px, "v": px} -> 3D point (base frame) from the saved depth (5x5 median); add "plane_z": <m> to intersect the pixel ray with the horizontal plane z = plane_z instead. '
+                         'Region form: {"capture": N, "cam": "wrist", "region": [u0,v0,u1,v1], "above_z": <m>} -> centroid, min/max, extent and top point of all surface points in that rectangle above the plane (free)',
             "move_ee": '{"position": {"x","y","z"}, "rotation": {"w","x","y","z"}, "mode": "linear"|"plan"} -> straight line holding orientation (default) or joint-space move to the IK solution; returns achieved ee_pose + target_error_mm; ok:false + error_code (CLAMP / IK_FAILED / SETTLE_MISS) if refused or not reached',
             "move_delta": '{"dpos": [dx,dy,dz], "drot_deg": [rx,ry,rz]} (either optional) -> relative straight-line move from the current pose; rotation deltas about the BASE axes',
             "move_joints": '{"joints": [7 floats radians]} -> joint-space move',
@@ -360,7 +364,10 @@ class Server:
                 "note": "depth npy = float32 metres along the optical axis; calib pose = camera pose in the robot base frame"}
 
     def cmd_deproject(self, a):
-        seq = int(a["capture"]); cam = str(a.get("cam", "wrist")); u = int(a["u"]); v = int(a["v"])
+        seq = int(a["capture"]); cam = str(a.get("cam", "wrist"))
+        if a.get("region") is not None:
+            return self._deproject_region(seq, cam, a)
+        u = int(a["u"]); v = int(a["v"])
         cp = self.frames / f"{seq:04d}_calib.json"
         if not cp.exists():
             return {"ok": False, "error": f"no calibration for capture {seq} (take frames first)"}
@@ -399,6 +406,47 @@ class Server:
         X = R @ (d * ray_c) + t
         return {"ok": True, "mode": "depth", "point_base": {"x": _r4(X[0]), "y": _r4(X[1]), "z": _r4(X[2])},
                 "depth_m": _r4(d), "valid_in_window": int(vals.size)}
+
+    def _deproject_region(self, seq, cam, a):
+        """3D statistics of every valid depth pixel inside a rectangle: centroid, extent and the highest
+        point, optionally keeping only points above a horizontal plane (e.g. the counter top). This is how
+        an object's centre and size are measured instead of one surface pixel."""
+        u0, v0, u1, v1 = [int(x) for x in a["region"]]
+        cp = self.frames / f"{seq:04d}_calib.json"
+        dp = self.frames / f"{seq:04d}_{cam}_depth.npy"
+        if not cp.exists() or not dp.exists():
+            return {"ok": False, "error": f"no depth/calibration for capture {seq} camera {cam!r} (take frames first)"}
+        calib = json.loads(cp.read_text())[cam]
+        K = np.asarray(calib["intrinsics"], dtype=float)
+        pose = calib["pose"]
+        R = _wxyz_to_mat([pose["rotation"][k] for k in "wxyz"])
+        t = np.array([pose["position"][k] for k in "xyz"], dtype=float)
+        depth = np.load(dp)
+        h, w = depth.shape
+        u0, u1 = sorted((max(0, u0), min(w - 1, u1))); v0, v1 = sorted((max(0, v0), min(h - 1, v1)))
+        if u1 <= u0 or v1 <= v0:
+            return {"ok": False, "error": "region must be [u0, v0, u1, v1] inside the image with u1 > u0 and v1 > v0"}
+        vs, us = np.mgrid[v0:v1 + 1, u0:u1 + 1]
+        d = depth[v0:v1 + 1, u0:u1 + 1].astype(float)
+        ok = (d > 0) & np.isfinite(d)
+        rays = np.linalg.inv(K) @ np.stack([us.ravel(), vs.ravel(), np.ones(us.size)])
+        X = (R @ (rays * d.ravel())).T + t
+        X = X[ok.ravel()]
+        if a.get("above_z") is not None:
+            X = X[X[:, 2] > float(a["above_z"])]
+        if len(X) < 5:
+            return {"ok": False, "error": "fewer than 5 valid points in the region (after the above_z filter)"}
+        lo, hi = X.min(axis=0), X.max(axis=0)
+        c = X.mean(axis=0)
+        top = X[np.argmax(X[:, 2])]
+        return {"ok": True, "mode": "region", "n_points": int(len(X)),
+                "centroid_base": {"x": _r4(c[0]), "y": _r4(c[1]), "z": _r4(c[2])},
+                "min_base": {"x": _r4(lo[0]), "y": _r4(lo[1]), "z": _r4(lo[2])},
+                "max_base": {"x": _r4(hi[0]), "y": _r4(hi[1]), "z": _r4(hi[2])},
+                "extent_m": {"x": _r4(hi[0] - lo[0]), "y": _r4(hi[1] - lo[1]), "z": _r4(hi[2] - lo[2])},
+                "top_point_base": {"x": _r4(top[0]), "y": _r4(top[1]), "z": _r4(top[2])},
+                "note": "points are the VISIBLE surface: an object's centre is about half its extent below top_point_base "
+                        "and in the middle of min/max in x and y"}
 
     def _gripper_cmd(self):
         return float(self.sim.observation.get("gripper_command", 1.0))
@@ -465,8 +513,15 @@ class Server:
         st = obs["public_state"]
         width = float(st["gripper_width_m"])
         frac = min(1.0, max(0.0, width / self.max_open))
-        return {"ok": True, "fraction": _r4(frac), "width_m": _r4(width), "duration_s": round(time.time() - t0, 1),
-                "note": "fraction 0 = fully closed, 1 = fully open; after close, fraction >> 0 means something is between the pads"}
+        out = {"ok": True, "action": act, "fraction": _r4(frac), "width_m": _r4(width), "duration_s": round(time.time() - t0, 1)}
+        if g == 0.0:
+            held = width >= HELD_MIN_WIDTH_M
+            out["held"] = held
+            out["note"] = (f"closed on something {width * 1000:.0f} mm wide: an object is between the pads" if held else
+                           f"the pads closed to {width * 1000:.0f} mm: the grasp is EMPTY (nothing between the fingers); re-observe and re-aim before retrying")
+        else:
+            out["note"] = "gripper open" if frac > 0.9 else f"the gripper opened only to {width * 1000:.0f} mm: something is blocking the fingers"
+        return out
 
     def cmd_move_base(self, a):
         t0 = time.time()
@@ -510,8 +565,19 @@ class Server:
             if self.counted >= self.budget:
                 return {"ok": False, "error": f"hard command budget ({self.budget}) exhausted", "error_code": "BUDGET"}
             self.counted += 1
+            self.free_streak = 0
+        elif cmd == "deproject":
+            self.free_streak += 1
+            if self.free_streak > MEASURE_LIMIT:
+                return {"ok": False, "error_code": "MEASUREMENT_LIMIT",
+                        "error": f"{self.free_streak - 1} deproject calls since the last motion or capture; measuring again returns "
+                                 "the same numbers. Act on them (move_ee / move_delta / gripper / move_base) or take new frames first"}
         try:
             resp = fn(req.get("args") or {})
+        except (KeyError, TypeError, ValueError) as e:
+            usage = self.cmd_help({})["commands"].get(cmd, "")
+            resp = {"ok": False, "error": f"bad arguments for {cmd}: {type(e).__name__} {str(e)[:120]}; usage: {usage[:300]}",
+                    "error_code": "INVALID_ARGUMENT"}
         except Exception as e:  # noqa: BLE001
             self._log(traceback.format_exc())
             resp = {"ok": False, "error": f"{type(e).__name__}: {str(e)[:300]}", "error_code": "INTERNAL"}

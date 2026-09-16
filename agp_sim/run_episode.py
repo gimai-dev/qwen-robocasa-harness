@@ -4,8 +4,8 @@
     python run_episode.py --task PickPlaceCounterToSink --seed 0 --out /home/jli/state/agp-sim/runs/<name>
 
 Layout of <out>/:
-  session/   what the agent sees: PROMPT.md, README_interface.md, robot_client.py, goal/, scratch/, frames/, bridge/,
-             server.log, agent_events.jsonl, agent_usage.json, agent_messages.json, transcript.md
+  session/   what the agent sees: PROMPT.md, README_interface.md, robot_client.py, goal/, scratch/, frames/, bridge/, server.log
+  agent_events.jsonl, agent_usage.json, agent_messages.json, transcript.md   (harness files, outside the session)
   sim/       the simulator child's run dir (mailbox, snapshots, video-frames, render) — never shown to the agent
   evaluator.jsonl   ground truth after every motion command (object pose, distance, contact, success)
   server_result.json, result.json
@@ -78,7 +78,7 @@ def milestones(evaluator_path: Path) -> dict:
 
 
 def transcript(session: Path) -> None:
-    ev = session / "agent_events.jsonl"
+    ev = session.parent / "agent_events.jsonl"
     if not ev.exists():
         return
     lines = ["# Agent transcript", ""]
@@ -99,7 +99,7 @@ def transcript(session: Path) -> None:
             lines.append(f"*viewed {e.get('path')}*\n")
         elif t in ("compact", "http_error", "request_error", "done"):
             lines.append(f"_{t}: {json.dumps({k: v for k, v in e.items() if k not in ('t', 'type')})}_\n")
-    (session / "transcript.md").write_text("\n".join(lines))
+    (session.parent / "transcript.md").write_text("\n".join(lines))
 
 
 def main():
@@ -171,7 +171,7 @@ def main():
     # 3. the agent
     token = Path(a.token_file).read_text().strip()
     agent = Agent(session, a.base_url, token, None, max_turns=a.max_turns, wall_s=a.wall_min * 60,
-                  temperature=a.temperature, max_images=a.max_images, python_bin=a.sim_python)
+                  temperature=a.temperature, max_images=a.max_images, python_bin=a.sim_python, log_dir=out)
     import urllib.request
     req = urllib.request.Request(a.base_url.rstrip("/") + "/models", headers={"Authorization": f"Bearer {token}"})
     with urllib.request.urlopen(req, timeout=30) as r:

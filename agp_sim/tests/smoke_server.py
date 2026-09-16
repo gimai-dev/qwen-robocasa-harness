@@ -95,6 +95,9 @@ for cam in ("left", "right", "wrist"):
             if e > 0.02: fails.append(f"plane deproject {cam} {e*1000:.0f} mm")
         if dp["ok"]:
             X = np.array([dp["point_base"][k] for k in "xyz"]); print(f"  depth deproject {cam}: {X.round(3).tolist()} vs tcp {ee.round(3).tolist()} (depth hits the gripper surface, so a few cm off is fine)")
+reg = rc("deproject", {"capture": fr["capture"], "cam": "wrist", "region": [200, 300, 320, 420]})
+if not reg["ok"]: fails.append("region deproject")
+reg2 = rc("deproject", {"capture": fr["capture"], "cam": "left", "region": [0, 0, 511, 479], "above_z": 0.25})
 d = np.load(fr["files"]["wrist"]["depth_npy"]); print(f"  wrist depth: shape {d.shape} min {np.nanmin(d[d>0]):.3f} max {np.nanmax(d[np.isfinite(d)]):.3f}")
 # motion
 m1 = rc("move_delta", {"dpos": [0.05, 0, 0]})
@@ -109,7 +112,7 @@ m4 = rc("move_delta", {"drot_deg": [0, 0, 30]})
 if not m4["ok"]: fails.append("move_delta yaw 30")
 rc("move_ee", {"position": s0["ee_pose"]["position"], "rotation": s0["ee_pose"]["rotation"], "mode": "plan"})
 # straight-down canonical pose 20 cm below/forward of ready
-p = dict(s0["ee_pose"]["position"]); p["z"] -= 0.15; p["x"] += 0.05
+p = dict(s0["ee_pose"]["position"]); p["z"] = 0.42; p["x"] += 0.05   # above the counter (top at z~0.22 + fingers)
 down = rc("move_ee", {"position": p, "rotation": {"w": 0, "x": 1, "y": 0, "z": 0}})
 if not down["ok"]: fails.append(f"straight-down pose: {down.get('error')}")
 g = rc("gripper", {"action": "close"}); print(f"  close -> fraction {g['fraction']} width {g['width_m']}")

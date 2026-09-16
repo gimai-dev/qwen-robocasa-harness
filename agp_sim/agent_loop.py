@@ -99,13 +99,19 @@ def parse_inline_tool_calls(text: str) -> list[dict]:
 
 class Agent:
     def __init__(self, session: Path, base_url: str, token: str, model: str, *, max_turns: int, wall_s: float,
-                 temperature: float = 0.2, max_images: int = MAX_IMAGES, ctx_soft: int = CTX_SOFT, python_bin: str | None = None):
+                 temperature: float = 0.2, max_images: int = MAX_IMAGES, ctx_soft: int = CTX_SOFT, python_bin: str | None = None,
+                 log_dir: Path | None = None):
         self.session = session.resolve()
+        # harness files live OUTSIDE the session so the agent cannot read its own event log
+        self.log_dir = (log_dir or self.session.parent).resolve()
+        self.log_dir.mkdir(parents=True, exist_ok=True)
         self.base_url = base_url.rstrip("/")
         self.token, self.model = token, model
         self.max_turns, self.wall_s, self.temperature = max_turns, wall_s, temperature
         self.max_images, self.ctx_soft = max_images, ctx_soft
-        self.events = open(self.session / "agent_events.jsonl", "a")
+        self.events = open(self.log_dir / "agent_events.jsonl", "a")
+        self.consecutive_nudges = 0
+        self.require_action = False
         self.usage = {"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "latency_s": 0.0, "max_prompt_tokens": 0,
                       "tool_calls": 0, "exec_calls": 0, "view_image_calls": 0, "compactions": 0, "errors": 0}
         env = dict(os.environ)
@@ -122,6 +128,8 @@ class Agent:
         self.env = env
         self.messages: list[dict] = []
         self.n_images = 0
+        self.recent_cmds: list[str] = []      # exec command lines, for loop detection
+        self.nudges_sent = 0
 
     # ---------- events ----------
     def _event(self, kind, **payload):
@@ -129,8 +137,95 @@ class Agent:
         self.events.flush()
 
     # ---------- tools ----------
+    _ROBOT_CMD = re.compile(r"robot_client\.py\s+\.\s+(?:--arm\s+\w+\s+)?(\w+)")
+
+    def _loop_note(self):
+        """Two loop signatures a coding-agent harness would also flag: the identical command line issued
+        three times in a row, or eight consecutive exec calls that only measure (deproject/state/status/help)
+        without any motion or capture. A note alone does not break Qwen's loops (the repeated exchanges in
+        context reinforce them), so the looping exchanges are also removed from the context, keeping one."""
+        rc = self.recent_cmds
+        note, n_loop = None, 0
+        if len(rc) >= 3 and rc[-1] == rc[-2] == rc[-3]:
+            n_loop = 3
+            while n_loop < len(rc) and rc[-n_loop - 1] == rc[-1]:
+                n_loop += 1
+            note = (f"[harness note] You ran the exact same command {n_loop} times in a row; the repeats were removed from your "
+                    "context because their answer never changes. Decide from what you already know and take a DIFFERENT action "
+                    "(move_ee / move_delta toward the object, gripper, move_base, or frames).")
+        elif len(rc) >= 8:
+            kinds = [set(self._ROBOT_CMD.findall(c)) for c in rc]
+            n_loop = 0
+            for k in reversed(kinds):
+                if k and k <= {"deproject", "state", "status", "help"}:
+                    n_loop += 1
+                else:
+                    break
+            if n_loop >= 8:
+                note = (f"[harness note] Your last {n_loop} tool calls only measured (deproject/state) and were removed from your "
+                        "context except the first. You already have the coordinates; measuring again will not change them. "
+                        "Write the object position, the destination and your move sequence to scratch/plan.md, then execute "
+                        "the first move_ee now.")
+            else:
+                n_loop = 0
+        if note:
+            summary = self._drop_last_exchanges(n_loop - 1)
+            if summary:
+                note += "\nResults of the removed calls (for reference):\n" + summary
+            self.recent_cmds = []
+            self.consecutive_nudges += 1
+            if self.consecutive_nudges >= 2:
+                self.require_action = True
+                note += ("\n[harness rule now in force] Your next tool call MUST contain a robot action: move_ee, move_delta, "
+                         "move_base, home or gripper (or `frames` to look again). Other commands will not be executed until you act.")
+        return note
+
+    _POINT = re.compile(r'"point_base": (\{[^}]*\})')
+
+    def _drop_last_exchanges(self, n):
+        """Remove the last n assistant tool-call exchanges (assistant + tool results + image messages) and
+        return a compact summary of the measurements they contained, so no number is lost."""
+        removed, lines = 0, []
+        while removed < n:
+            idx = None
+            for i in range(len(self.messages) - 1, 1, -1):
+                if self.messages[i].get("role") == "assistant" and self.messages[i].get("tool_calls"):
+                    idx = i
+                    break
+            if idx is None:
+                break
+            j = idx + 1
+            cmd = ""
+            try:
+                cmd = json.loads(self.messages[idx]["tool_calls"][0]["function"]["arguments"]).get("command", "")
+            except Exception:  # noqa: BLE001
+                pass
+            while j < len(self.messages) and (self.messages[j].get("role") == "tool" or self.messages[j].get("_image")):
+                if self.messages[j].get("role") == "tool":
+                    for m_ in self._POINT.finditer(str(self.messages[j].get("content", ""))):
+                        arg = re.search(r"deproject\s+'([^']*)'", cmd)
+                        lines.append(f"- deproject {arg.group(1) if arg else ''} -> point_base {m_.group(1)}")
+                j += 1
+            del self.messages[idx:j]
+            removed += 1
+        self._event("drop_exchanges", n=removed, kept_results=len(lines))
+        lines = list(dict.fromkeys(lines))[-12:]
+        return "\n".join(reversed(lines))
+
+    _ACTION_CMDS = {"move_ee", "move_delta", "move_joints", "home", "gripper", "move_base", "frames"}
+
     def tool_exec(self, args):
         cmd = str(args.get("command", ""))
+        self.recent_cmds.append(cmd.strip())
+        self.recent_cmds = self.recent_cmds[-20:]
+        acts = set(self._ROBOT_CMD.findall(cmd)) & self._ACTION_CMDS
+        if acts:
+            self.require_action = False
+            self.consecutive_nudges = 0
+        elif self.require_action:
+            self._event("exec_refused", command=cmd)
+            return ("[harness] This command was NOT executed. After repeated loops the next tool call must contain a robot action "
+                    "(move_ee, move_delta, move_base, home, gripper) or `frames`. Use the coordinates you already have and act.")
         timeout = int(args.get("timeout_s") or 300)
         timeout = max(5, min(timeout, 900))
         t0 = _now()
@@ -228,6 +323,7 @@ class Agent:
     def _request(self):
         body = {"model": self.model, "messages": self._wire(), "tools": TOOLS, "tool_choice": "auto",
                 "max_tokens": MAX_TOKENS, "temperature": self.temperature, "top_p": 0.95,
+                "presence_penalty": 0.3, "repetition_penalty": 1.05,
                 "chat_template_kwargs": {"enable_thinking": False}}
         data = json.dumps(body).encode()
         req = urllib.request.Request(self.base_url + "/chat/completions", data=data,
@@ -295,7 +391,7 @@ class Agent:
                                            for i, tc in enumerate(calls)]
             self.messages.append(assistant)
             if not calls:
-                (self.session / "agent_last_message.txt").write_text(assistant["content"])
+                (self.log_dir / "agent_last_message.txt").write_text(assistant["content"])
                 if (self.session / "scratch" / "RESULT.md").exists() or nudges >= 2:
                     outcome = "finished" if (self.session / "scratch" / "RESULT.md").exists() else "stopped_without_result"
                     break
@@ -323,19 +419,24 @@ class Agent:
                 else:
                     self.messages.append({"role": "tool", "tool_call_id": tc["id"], "content": f"error: unknown tool {name}"})
             self._prune_images()
+            note = self._loop_note()
+            if note:
+                self.messages.append({"role": "user", "content": note})
+                self.nudges_sent += 1
+                self._event("nudge", note=note)
             if ptok > self.ctx_soft:
                 self._compact()
         self.usage["wall_s"] = round(_now() - t_start, 1)
         self.usage["turns"] = self.usage["requests"]
         self.usage["outcome"] = outcome
-        (self.session / "agent_usage.json").write_text(json.dumps(self.usage, indent=1))
+        (self.log_dir / "agent_usage.json").write_text(json.dumps(self.usage, indent=1))
         stripped = []
         for m in self.messages:
             mm = {k: v for k, v in m.items() if not k.startswith("_")}
             if isinstance(mm.get("content"), list):
                 mm["content"] = [p if p.get("type") == "text" else {"type": "image_url", "image_url": {"url": "<stripped>"}} for p in mm["content"]]
             stripped.append(mm)
-        (self.session / "agent_messages.json").write_text(json.dumps(stripped, indent=1))
+        (self.log_dir / "agent_messages.json").write_text(json.dumps(stripped, indent=1))
         self._event("done", outcome=outcome, **{k: v for k, v in self.usage.items() if k != "outcome"})
         return outcome
 

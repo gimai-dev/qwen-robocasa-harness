@@ -46,6 +46,13 @@ python3 robot_client.py . <command> ['<json-args>']
    and the destination, and check whether they are within the arm's reach
    from where the base stands (see the reach note in `README_interface.md`);
    drive the base closer with `move_base` when they are not.
+6. Measure once, then act. One `deproject` region call around the object
+   (with the counter height as `above_z`) gives its centre and size; one
+   more on the destination gives where to release. Write them and your
+   move sequence (approach above the object, descend to its centre height,
+   close, verify `held` and lift, carry, lower, open, withdraw) to
+   `scratch/plan.md`, then execute it. Re-measure only after something has
+   moved. Repeating a measurement does not change it.
 
 ## Deliverable
 
