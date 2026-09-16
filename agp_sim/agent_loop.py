@@ -116,6 +116,7 @@ class Agent:
         self.required_msg = ""
         self.empty_closes = 0                      # consecutive empty closes without a fresh measurement in between
         self.failed_moves = 0                      # consecutive motion commands that returned ok:false
+        self.recent_targets: list = []             # move_ee target positions of consecutive move commands
         self.usage = {"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "latency_s": 0.0, "max_prompt_tokens": 0,
                       "tool_calls": 0, "exec_calls": 0, "view_image_calls": 0, "compactions": 0, "errors": 0}
         env = dict(os.environ)
@@ -159,6 +160,17 @@ class Agent:
             self.consecutive_nudges += 1
             self._event("nudge", note="failed-moves rule")
             return "[harness note] " + self.required_msg
+        if len(self.recent_targets) >= 6:
+            pts = self.recent_targets[-6:]
+            spread = max(max(abs(a[i] - b[i]) for i in range(3)) for a in pts for b in pts)
+            if spread < 0.015:
+                self.recent_targets = []
+                self.required_cmds = {"gripper", "frames", "home"}
+                self.required_msg = ("Six move_ee commands in a row targeted the same spot within 1.5 cm: millimetre adjustments do not "
+                                     "change anything. Either close the gripper now, or take `frames` and re-measure, or go `home`.")
+                self.consecutive_nudges += 1
+                self._event("nudge", note="micro-move rule")
+                return "[harness note] " + self.required_msg
         if self.empty_closes >= 3:
             self.empty_closes = 0
             self.required_cmds = {"deproject", "frames"}
@@ -293,6 +305,16 @@ class Agent:
             self.empty_closes += 1
         elif '"held": true' in out:
             self.empty_closes = 0
+        # micro-adjustment sweeps: consecutive move_ee targets within 1.5 cm of each other
+        tgt = re.search(r'"position"\s*:\s*\{\s*"x"\s*:\s*([-\d.]+)\s*,\s*"y"\s*:\s*([-\d.]+)\s*,\s*"z"\s*:\s*([-\d.]+)', cmd)
+        if "move_ee" in names and tgt and "gripper" not in names and "frames" not in names:
+            try:
+                self.recent_targets.append(tuple(float(v) for v in tgt.groups()))
+            except ValueError:
+                pass
+            self.recent_targets = self.recent_targets[-8:]
+        elif acts:
+            self.recent_targets = []
         # consecutive failed motion commands (SETTLE_MISS / IK_FAILED / CLAMP sweeps)
         if acts and acts <= {"move_ee", "move_delta", "move_joints", "move_base"}:
             self.failed_moves = self.failed_moves + 1 if ('"ok": false' in out and '"ok": true' not in out) else 0
