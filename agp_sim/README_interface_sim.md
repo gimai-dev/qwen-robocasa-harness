@@ -73,7 +73,7 @@ times out, check server liveness with `tail -3 server.log` and retry once.
 | `move_delta` | `{"dpos":[dx,dy,dz],"drot_deg":[rx,ry,rz]}` (either optional) | relative straight-line move from the current pose; rotation deltas about the BASE axes, applied before the current rotation |
 | `move_joints` | `{"joints":[7 floats]}` | joint-space move (radians) |
 | `home` | — | move to the READY posture (arm raised, wrist camera looking forward and down over the workspace) |
-| `gripper` | `{"action":"open"\|"close"}` | returns `fraction` (0 closed … 1 open), `width_m` and, after `close`, `held` (true only when the pads stopped on an object at least 12 mm wide). `held: false` means the grasp is EMPTY, whatever the images look like: re-observe and re-aim |
+| `gripper` | `{"action":"open"\|"close"}` | returns `fraction` (0 closed … 1 open), `width_m` and, after `close`, `held` (true only when the pads stopped on an object at least 12 mm wide). `held: false` means the grasp is EMPTY, whatever the images look like: re-observe and re-aim. The fingers keep their last state through every move: after an empty close, `open` before descending again |
 | `move_base` | `{"axis":"x"\|"y"\|"yaw","distance":<m or rad>}` | drives the mobile base: `x` forward along its heading, `y` to its left, `yaw` counter-clockwise; at most 0.5 m / 1.0 rad per call; the arm keeps its joint angles (so the tool moves with the base). Returns `base_world` before/after and the distance actually moved; a note tells you when furniture blocked it |
 
 ## Cameras

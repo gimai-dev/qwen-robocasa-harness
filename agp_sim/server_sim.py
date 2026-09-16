@@ -518,7 +518,8 @@ class Server:
             held = width >= HELD_MIN_WIDTH_M
             out["held"] = held
             out["note"] = (f"closed on something {width * 1000:.0f} mm wide: an object is between the pads" if held else
-                           f"the pads closed to {width * 1000:.0f} mm: the grasp is EMPTY (nothing between the fingers); re-observe and re-aim before retrying")
+                           f"the pads closed to {width * 1000:.0f} mm: the grasp is EMPTY (nothing between the fingers). The fingers STAY CLOSED "
+                           "until you send gripper open, so open them before the next approach or they will only poke the object; re-observe and re-aim")
         else:
             out["note"] = "gripper open" if frac > 0.9 else f"the gripper opened only to {width * 1000:.0f} mm: something is blocking the fingers"
         return out
