@@ -262,7 +262,7 @@ class Agent:
         lines = list(dict.fromkeys(lines))[-12:]
         return "\n".join(reversed(lines))
 
-    _ACTION_CMDS = {"move_ee", "move_delta", "move_joints", "home", "gripper", "move_base", "frames", "move_path", "grasp_at", "place_at"}
+    _ACTION_CMDS = {"move_ee", "move_delta", "move_joints", "home", "gripper", "move_base", "frames", "move_path", "grasp_at", "place_at", "approach_base"}
 
     def tool_exec(self, args):
         cmd = str(args.get("command", ""))

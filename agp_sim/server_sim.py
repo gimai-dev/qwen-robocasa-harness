@@ -38,7 +38,7 @@ from direct.kinematics import (JOINT_LIMITS, panda_fk, plan_pose_segment,  # noq
                                quat_xyzw_to_matrix, solve_pose_multistart)
 
 FREE_CMDS = {"status", "help", "state", "deproject", "fk", "check_pose"}
-MOTION_CMDS = {"move_ee", "move_delta", "move_joints", "home", "gripper", "move_base", "move_path", "grasp_at", "place_at"}
+MOTION_CMDS = {"move_ee", "move_delta", "move_joints", "home", "gripper", "move_base", "move_path", "grasp_at", "place_at", "approach_base"}
 # interface ablations (2026-09-16): which commands exist. full = the agent-as-policy set; joint = no Cartesian moves
 # (fk instead); path = full + multi-waypoint move_path; macro = full + grasp_at / place_at macros.
 INTERFACES = {
@@ -353,7 +353,8 @@ class Server:
             "check_pose": '{"position": {"x","y","z"}, "rotation": {"w","x","y","z"}} -> tests a target WITHOUT moving: clamp, IK reachability from the current joints, residual, horizontal distance from the base (free)',
             "home": "{} -> the ready/observe posture (arm raised over the workspace, wrist camera looking forward-down)",
             "gripper": '{"action": "open"|"close"} -> returns fraction (0 closed .. 1 open) and width_m; close stops on the object, so a clearly nonzero fraction after close means something is held',
-            "move_base": '{"axis": "x"|"y"|"yaw", "distance": <m or rad>} -> drives the mobile base: x forward along its heading, y to its left, yaw counter-clockwise; |distance| <= 0.5 m / 1.0 rad per call; the arm holds its joints; returns base_world before/after',
+            "move_base": '{"axis": "x"|"y"|"yaw", "distance": <m or rad>} -> drives the mobile base: x forward along its heading, y to its left, yaw counter-clockwise; |distance| <= 0.3 m / 1.0 rad per call; the arm holds its joints. After ANY base motion every base-frame coordinate you measured before is stale: re-measure from new frames',
+            "approach_base": '{"target": {"x", "y"}, "standoff": 0.55} -> turns the base to face a base-frame point and drives towards it until it is `standoff` metres straight ahead (or the base is blocked); returns the target re-expressed in the NEW base frame (target_now), the distances moved and blocked. Use it instead of chains of move_base',
         }}
 
     def cmd_state(self, a):
@@ -573,7 +574,7 @@ class Server:
         dist = float(a.get("distance", 0.0))
         if axis not in ("x", "y", "yaw") or dist == 0.0:
             return {"ok": False, "error": 'move_base needs {"axis": "x"|"y"|"yaw", "distance": nonzero}'}
-        limit = 1.0 if axis == "yaw" else 0.5
+        limit = 1.0 if axis == "yaw" else 0.3
         if abs(dist) > limit:
             return {"ok": False, "error": f"|distance| must be <= {limit} per call", "error_code": "CLAMP"}
         st0 = self._state_raw()
@@ -606,6 +607,67 @@ class Server:
                "steps": steps, "duration_s": round(time.time() - t0, 1), "ee_pose": self._ee_agent(st)}
         if axis != "yaw" and math.hypot(*moved[:2]) < min(0.02, abs(dist) * 0.2):
             out["note"] = "the base barely moved: it is probably blocked by furniture in that direction"
+        out["coordinates_stale"] = True
+        out["stale_note"] = "the base moved: every base-frame coordinate measured before this call is now wrong; take frames and re-measure"
+        return out
+
+    def _base_pose_world(self):
+        st = self._state_raw()
+        return (np.asarray(st["base_world_position_m"][:2], dtype=float), float(st["base_world_yaw_rad"]))
+
+    def cmd_approach_base(self, a):
+        """Turn towards a base-frame point and drive until it is `standoff` m straight ahead."""
+        t0 = time.time()
+        tx, ty = float(a["target"]["x"]), float(a["target"]["y"])
+        standoff = float(a.get("standoff", 0.55))
+        if not 0.3 <= standoff <= 0.8:
+            return {"ok": False, "error": "standoff must be between 0.3 and 0.8 m", "error_code": "INVALID_ARGUMENT"}
+        p0, yaw0 = self._base_pose_world()
+        # the target in the WORLD frame (fixed while the base moves)
+        c, s_ = math.cos(yaw0), math.sin(yaw0)
+        tw = p0 + np.array([c * tx - s_ * ty, s_ * tx + c * ty])
+
+        def target_now():
+            p, yaw = self._base_pose_world()
+            d = tw - p
+            c2, s2 = math.cos(-yaw), math.sin(-yaw)
+            return np.array([c2 * d[0] - s2 * d[1], s2 * d[0] + c2 * d[1]])
+
+        steps, turned, driven, blocked = 0, 0.0, 0.0, False
+        g = self._gripper_cmd()
+        # 1. turn until the target is within 8 degrees of straight ahead (max 12 yaw slots)
+        for _ in range(12):
+            t = target_now()
+            ang = math.atan2(t[1], t[0])
+            if abs(ang) < math.radians(8):
+                break
+            v = BASE_VELOCITY if ang > 0 else -BASE_VELOCITY
+            obs = self.sim.send({"kind": "base", "a": "yaw", "v": v, "g": g, "steps": 20, "motion_steps": 16}, timeout_s=120)
+            steps += int(obs["execution"]["steps_executed"])
+            turned += abs(float(obs["execution"]["base_yaw_after_rad"]) - float(obs["execution"]["base_yaw_before_rad"]))
+        # 2. drive forward until the target is `standoff` ahead or the base stops moving (max 20 slots ~ 3 m)
+        for _ in range(20):
+            t = target_now()
+            if t[0] - standoff < 0.03:
+                break
+            v = BASE_VELOCITY if t[0] - standoff > 0 else -BASE_VELOCITY
+            obs = self.sim.send({"kind": "base", "a": "x", "v": v, "g": g, "steps": 20, "motion_steps": 16}, timeout_s=120)
+            ex = obs["execution"]
+            steps += int(ex["steps_executed"])
+            b0, b1 = ex["base_world_before_m"], ex["base_world_after_m"]
+            d = math.hypot(b1[0] - b0[0], b1[1] - b0[1])
+            driven += d
+            if d < 0.005:
+                blocked = True
+                break
+        t = target_now()
+        out = {"ok": True, "target_now": {"x": _r4(t[0]), "y": _r4(t[1])}, "distance_ahead_m": _r4(t[0]), "lateral_offset_m": _r4(t[1]),
+               "turned_rad": _r4(turned), "driven_m": _r4(driven), "blocked": blocked, "steps": steps,
+               "duration_s": round(time.time() - t0, 1), "ee_pose": self._ee_agent(), "coordinates_stale": True,
+               "note": ("the base is blocked by furniture before reaching the standoff; the target is still "
+                        f"{t[0]:.2f} m ahead, {t[1]:+.2f} m to the left" if blocked else
+                        f"the target is now {t[0]:.2f} m ahead and {t[1]:+.2f} m to the left of the base") +
+                       "; every base-frame coordinate measured before this call is stale — take frames and re-measure"}
         return out
 
     def cmd_check_pose(self, a):

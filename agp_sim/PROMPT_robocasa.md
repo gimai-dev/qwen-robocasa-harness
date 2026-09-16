@@ -45,7 +45,9 @@ python3 robot_client.py . <command> ['<json-args>']
 5. Start by looking: take `frames`, view all three images, find the object
    and the destination, and check whether they are within the arm's reach
    from where the base stands (see the reach note in `README_interface.md`);
-   drive the base closer with `move_base` when they are not.
+   bring the base closer with one `approach_base` call when they are not,
+   then take `frames` again (base-frame coordinates change when the base
+   moves).
 6. Measure once, then act. One `deproject` region call around the object
    (with the counter height as `above_z`) gives its centre and size; one
    more on the destination gives where to release. Write them and your

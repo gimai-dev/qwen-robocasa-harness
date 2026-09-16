@@ -75,7 +75,28 @@ times out, check server liveness with `tail -3 server.log` and retry once.
 | `check_pose` | `{"position":{"x","y","z"},"rotation":{"w","x","y","z"}}` | tests a target WITHOUT moving: reachable or not, whether a straight line works, IK residual, horizontal distance (free). Use it before a `move_ee` you are unsure about instead of finding out by a failed move |
 | `home` | — | move to the READY posture (arm raised, wrist camera looking forward and down over the workspace) |
 | `gripper` | `{"action":"open"\|"close"}` | returns `fraction` (0 closed … 1 open), `width_m` and, after `close`, `held` (true only when the pads stopped on an object at least 12 mm wide). `held: false` means the grasp is EMPTY, whatever the images look like: re-observe and re-aim. The fingers keep their last state through every move: after an empty close, `open` before descending again. While an object is held, every move response carries `carrying: true`; if the width collapses during a move the response says `dropped: true` — the object is no longer in the gripper |
-| `move_base` | `{"axis":"x"\|"y"\|"yaw","distance":<m or rad>}` | drives the mobile base: `x` forward along its heading, `y` to its left, `yaw` counter-clockwise; at most 0.5 m / 1.0 rad per call; the arm keeps its joint angles (so the tool moves with the base). Returns `base_world` before/after and the distance actually moved; a note tells you when furniture blocked it |
+| `approach_base` | `{"target":{"x","y"},"standoff":0.55}` | the way to get closer to something: turns the base to face that base-frame point and drives towards it until it is `standoff` m straight ahead (stops early if furniture blocks). Returns `target_now` (the same point in the NEW base frame), how far it turned and drove, and `blocked`. One call replaces a chain of `move_base` guesses |
+| `move_base` | `{"axis":"x"\|"y"\|"yaw","distance":<m or rad>}` | low-level base motion: `x` forward along its heading, `y` to its left, `yaw` counter-clockwise; at most 0.3 m / 1.0 rad per call; the arm keeps its joint angles. Returns `base_world` before/after and the distance actually moved; a note tells you when furniture blocked it |
+
+## Moving the base
+
+Every pose and every `deproject` result is in the base frame, so **after any
+base motion all coordinates you measured before are wrong**: the response
+says `coordinates_stale: true`. Take `frames` and re-measure before the next
+arm move. Prefer one `approach_base` call to a chain of `move_base` calls;
+`approach_base` reports the target in the new frame for you. The arm reaches
+about 0.7 m horizontally from the base; objects farther than that need the
+base brought closer first.
+
+## Carrying an object
+
+Lift the held object to at least z = 0.45 before moving sideways and carry it
+at or above that height over counters, sinks and stoves; appliances, faucets
+and cabinet doors along the path reach higher than the counter top. Moving
+sideways at counter height drags the object into whatever stands there and
+knocks it out of the fingers (thin objects such as spoons go first). Every
+move while holding returns `carrying: true`; `dropped: true` means the object
+is gone — stop carrying and find it again.
 
 ## Cameras
 

@@ -125,6 +125,8 @@ g = rc("gripper", {"action": "open"}); print(f"  open -> fraction {g['fraction']
 if g["fraction"] < 0.9: fails.append("open fraction not near 1")
 b = rc("move_base", {"axis": "x", "distance": 0.10}); print(f"  base moved {b.get('base_moved_world_m')}")
 b = rc("move_base", {"axis": "yaw", "distance": -0.3}); print(f"  yaw moved {b.get('yaw_moved_rad')}")
+ab = rc("approach_base", {"target": {"x": 1.2, "y": 0.6}, "standoff": 0.55}); print(f"  approach_base -> {ab.get('target_now')} turned {ab.get('turned_rad')} driven {ab.get('driven_m')} blocked {ab.get('blocked')}")
+if not ab.get("ok") or abs(ab["target_now"]["y"]) > 0.25: fails.append(f"approach_base did not face the target: {ab}")
 h = rc("home")
 if not h["ok"]: fails.append("home")
 rc("bogus")
