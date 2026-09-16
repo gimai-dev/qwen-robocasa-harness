@@ -112,6 +112,9 @@ class Agent:
         self.events = open(self.log_dir / "agent_events.jsonl", "a")
         self.consecutive_nudges = 0
         self.require_action = False
+        self.required_cmds: set | None = None      # when set, the next exec must contain one of these robot commands
+        self.required_msg = ""
+        self.empty_closes = 0                      # consecutive empty closes without a fresh measurement in between
         self.usage = {"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "latency_s": 0.0, "max_prompt_tokens": 0,
                       "tool_calls": 0, "exec_calls": 0, "view_image_calls": 0, "compactions": 0, "errors": 0}
         env = dict(os.environ)
@@ -146,7 +149,22 @@ class Agent:
         context reinforce them), so the looping exchanges are also removed from the context, keeping one."""
         rc = self.recent_cmds
         note, n_loop = None, 0
-        if len(rc) >= 3 and rc[-1] == rc[-2] == rc[-3]:
+        if self.empty_closes >= 3:
+            self.empty_closes = 0
+            self.required_cmds = {"deproject", "frames"}
+            self.required_msg = ("Three grasps in a row closed on nothing at about the same spot: the object is NOT where you think. "
+                                 "Take `frames`, then measure the object again with a `deproject` region call (wrist camera, "
+                                 "above_z = counter height) and aim at the middle of min/max in x,y and at its centre height.")
+            self.consecutive_nudges += 1
+            self._event("nudge", note="empty-close rule")
+            return "[harness note] " + self.required_msg
+        cyc = self._cycle_length(rc)
+        if cyc:
+            n_loop = cyc * 2
+            note = (f"[harness note] You are repeating the same {cyc}-command cycle; the repeats were removed from your context "
+                    "because the outcome never changes. Do something different: re-observe (frames), re-measure the object with a "
+                    "deproject region call, change the grasp height/orientation, or drive the base.")
+        elif len(rc) >= 3 and rc[-1] == rc[-2] == rc[-3]:
             n_loop = 3
             while n_loop < len(rc) and rc[-n_loop - 1] == rc[-1]:
                 n_loop += 1
@@ -181,6 +199,15 @@ class Agent:
         return note
 
     _POINT = re.compile(r'"point_base": (\{[^}]*\})')
+
+    @staticmethod
+    def _cycle_length(rc):
+        """k if the last 2k commands are the same k-command cycle twice (k in 2..6, ignoring digits), else 0."""
+        norm = [re.sub(r"[-\d.]+", "#", c) for c in rc]
+        for k in range(2, 7):
+            if len(norm) >= 3 * k and norm[-k:] == norm[-2 * k:-k] == norm[-3 * k:-2 * k]:
+                return k
+        return 0
 
     def _drop_last_exchanges(self, n):
         """Remove the last n assistant tool-call exchanges (assistant + tool results + image messages) and
@@ -218,7 +245,15 @@ class Agent:
         cmd = str(args.get("command", ""))
         self.recent_cmds.append(cmd.strip())
         self.recent_cmds = self.recent_cmds[-20:]
-        acts = set(self._ROBOT_CMD.findall(cmd)) & self._ACTION_CMDS
+        names = set(self._ROBOT_CMD.findall(cmd))
+        acts = names & self._ACTION_CMDS
+        if self.required_cmds is not None:
+            if names & self.required_cmds:
+                self.required_cmds = None
+                self.consecutive_nudges = 0
+            else:
+                self._event("exec_refused", command=cmd)
+                return "[harness] This command was NOT executed. " + self.required_msg
         if acts:
             self.require_action = False
             self.consecutive_nudges = 0
@@ -226,6 +261,8 @@ class Agent:
             self._event("exec_refused", command=cmd)
             return ("[harness] This command was NOT executed. After repeated loops the next tool call must contain a robot action "
                     "(move_ee, move_delta, move_base, home, gripper) or `frames`. Use the coordinates you already have and act.")
+        if "deproject" in names or "frames" in names:
+            self.empty_closes = 0
         timeout = int(args.get("timeout_s") or 300)
         timeout = max(5, min(timeout, 900))
         t0 = _now()
@@ -242,6 +279,10 @@ class Agent:
             out = out[: MAX_OUTPUT // 2] + f"\n...[{len(out) - MAX_OUTPUT} chars omitted]...\n" + out[-MAX_OUTPUT // 2:]
         self.usage["exec_calls"] += 1
         self._event("exec", command=cmd, seconds=round(_now() - t0, 1), output=out[:2000])
+        if '"held": false' in out:
+            self.empty_closes += 1
+        elif '"held": true' in out:
+            self.empty_closes = 0
         return out
 
     def tool_view_image(self, args):

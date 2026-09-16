@@ -533,22 +533,35 @@ class Server:
         limit = 1.0 if axis == "yaw" else 0.5
         if abs(dist) > limit:
             return {"ok": False, "error": f"|distance| must be <= {limit} per call", "error_code": "CLAMP"}
-        unit = BASE_STEP_RAD if axis == "yaw" else BASE_STEP_M
-        n = max(1, int(round(abs(dist) / unit)))
         st0 = self._state_raw()
         before = self._base_of(st0)
         v = BASE_VELOCITY if dist > 0 else -BASE_VELOCITY
         steps = 0
-        for _ in range(n):
+        p0 = np.asarray(before["position"][:2], dtype=float)
+        yaw0 = float(before["yaw_rad"])
+        # closed loop: one 20-step base slot at a time until the measured displacement reaches the request
+        # (per-slot displacement differs by axis: ~5 cm in x against furniture drag, ~15 cm in y)
+        for _ in range(24):
             obs = self.sim.send({"kind": "base", "a": axis, "v": v, "g": self._gripper_cmd(), "steps": 20, "motion_steps": 16}, timeout_s=120)
             steps += int(obs["execution"]["steps_executed"])
+            st = self._state_raw()
+            if axis == "yaw":
+                moved = abs(((float(st["base_world_yaw_rad"]) - yaw0 + math.pi) % (2 * math.pi)) - math.pi)
+            else:
+                moved = float(np.linalg.norm(np.asarray(st["base_world_position_m"][:2]) - p0))
+            if moved >= abs(dist) - 0.02:
+                break
+            ex = obs["execution"]
+            b0, b1 = ex.get("base_world_before_m"), ex.get("base_world_after_m")
+            if axis != "yaw" and b0 and b1 and math.hypot(b1[0] - b0[0], b1[1] - b0[1]) < 0.005:
+                break   # blocked: stop pushing
         st = self._state_raw()
         after = self._base_of(st)
         moved = [round(a_ - b_, 4) for a_, b_ in zip(after["position"], before["position"])]
         out = {"ok": True, "axis": axis, "requested": dist, "base_world_before": before, "base_world_after": after,
                "base_moved_world_m": moved, "yaw_moved_rad": _r4(after["yaw_rad"] - before["yaw_rad"]),
                "steps": steps, "duration_s": round(time.time() - t0, 1), "ee_pose": self._ee_agent(st)}
-        if axis != "yaw" and math.hypot(*moved[:2]) < 0.01 * n:
+        if axis != "yaw" and math.hypot(*moved[:2]) < min(0.02, abs(dist) * 0.2):
             out["note"] = "the base barely moved: it is probably blocked by furniture in that direction"
         return out
 
