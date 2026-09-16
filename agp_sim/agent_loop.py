@@ -115,6 +115,7 @@ class Agent:
         self.required_cmds: set | None = None      # when set, the next exec must contain one of these robot commands
         self.required_msg = ""
         self.empty_closes = 0                      # consecutive empty closes without a fresh measurement in between
+        self.failed_moves = 0                      # consecutive motion commands that returned ok:false
         self.usage = {"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "latency_s": 0.0, "max_prompt_tokens": 0,
                       "tool_calls": 0, "exec_calls": 0, "view_image_calls": 0, "compactions": 0, "errors": 0}
         env = dict(os.environ)
@@ -149,6 +150,15 @@ class Agent:
         context reinforce them), so the looping exchanges are also removed from the context, keeping one."""
         rc = self.recent_cmds
         note, n_loop = None, 0
+        if self.failed_moves >= 6:
+            self.failed_moves = 0
+            self.required_cmds = {"frames", "home"}
+            self.required_msg = ("Six motion commands in a row failed (SETTLE_MISS / IK_FAILED / CLAMP): nudging the target by a few "
+                                 "millimetres will keep failing. Go back to `home` or take `frames`, re-measure, and choose a clearly "
+                                 "different target: farther from the base (0.35-0.65 m), a different height, or drive the base.")
+            self.consecutive_nudges += 1
+            self._event("nudge", note="failed-moves rule")
+            return "[harness note] " + self.required_msg
         if self.empty_closes >= 3:
             self.empty_closes = 0
             self.required_cmds = {"deproject", "frames"}
@@ -283,6 +293,11 @@ class Agent:
             self.empty_closes += 1
         elif '"held": true' in out:
             self.empty_closes = 0
+        # consecutive failed motion commands (SETTLE_MISS / IK_FAILED / CLAMP sweeps)
+        if acts and acts <= {"move_ee", "move_delta", "move_joints", "move_base"}:
+            self.failed_moves = self.failed_moves + 1 if ('"ok": false' in out and '"ok": true' not in out) else 0
+        elif acts:
+            self.failed_moves = 0
         return out
 
     def tool_view_image(self, args):
