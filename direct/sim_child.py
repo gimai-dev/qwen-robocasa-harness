@@ -336,6 +336,10 @@ class Child:
         gripper_open = float(command["g"])
         if gripper_open not in (0.0, 1.0):
             raise ValueError("gripper must be 0 or 1")
+        # optional per-command joint rate cap (agent-as-policy: slower tracking while carrying an object)
+        step_cap = float(command.get("max_joint_step", MAX_JOINT_STEP))
+        if not 0.005 <= step_cap <= MAX_JOINT_STEP:
+            raise ValueError("max_joint_step must be within 0.005..MAX_JOINT_STEP")
         initial = _arm_qpos(environment)
         before = _public_state(public_raw, environment)
         commanded: list[float] | None = None
@@ -356,7 +360,7 @@ class Child:
                 pauses += 1
             else:
                 target = path[path_index]
-                waypoint = [c + max(-MAX_JOINT_STEP, min(MAX_JOINT_STEP, d - c)) for c, d in zip(commanded, target, strict=True)]
+                waypoint = [c + max(-step_cap, min(step_cap, d - c)) for c, d in zip(commanded, target, strict=True)]
                 if path_index < len(path) - 1 and max(abs(w - t) for w, t in zip(waypoint, target, strict=True)) < 1e-9:
                     path_index += 1
             raw = self.step(environment, waypoint, gripper_open, chassis.correction(public_raw))

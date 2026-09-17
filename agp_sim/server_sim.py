@@ -52,6 +52,7 @@ MAX_PATH_WAYPOINTS = 8
 CAMS = ("left", "right", "wrist")
 SLOT_STEPS = 64
 MAX_SLOTS = 8
+CARRY_JOINT_STEP = 0.03       # rad per sim step while an object is held (0.6 rad/s vs the free 1.6 rad/s): no flinging
 SETTLE_TOL_RAD = 0.03
 CONTACT_FORCE_N = 15.0
 MEASURE_LIMIT = 24            # free deproject calls allowed between two counted commands
@@ -204,8 +205,13 @@ class Server:
         total, peak, err, prev_err, slots = 0, 0.0, None, None, 0
         ex = None
         path = [list(map(float, w)) for w in waypoints]
-        while slots < MAX_SLOTS:
-            obs = self.sim.send({"kind": "slot", "waypoints": path, "g": float(gripper), "steps": SLOT_STEPS}, timeout_s=600)
+        carrying = bool(getattr(self, "carrying", False)) and float(gripper) == 0.0
+        max_slots = MAX_SLOTS * 3 if carrying else MAX_SLOTS
+        slot_cmd = {"kind": "slot", "g": float(gripper), "steps": SLOT_STEPS}
+        if carrying:
+            slot_cmd["max_joint_step"] = CARRY_JOINT_STEP
+        while slots < max_slots:
+            obs = self.sim.send({**slot_cmd, "waypoints": path}, timeout_s=600)
             ex = obs.get("execution") or {}
             if ex.get("kind") != "slot":
                 raise RuntimeError(f"simulator answered a {ex.get('kind')!r} receipt to a slot command")
