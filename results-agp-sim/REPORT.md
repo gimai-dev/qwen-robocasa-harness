@@ -189,9 +189,12 @@ everywhere.
 | dev8 | v8 = v7 + `approach_base`, stale-coordinate warnings, carry-height text | 4 / 45 | 2/9 | 7/9 | 4/9 |
 | dev9 | v9 = v8 + slow joint tracking while carrying | 4 / 45 | 0/9 | 9/9 | 3/9 |
 | v11c | v6 + slow carry only | 4 / 90 | 2/9 | 6/9 | 5/9 |
-| v11a | v6 + placement / flat-object README text | 4 / 90 | (running) | | |
-| v11b | v6 + phase-checklist prompt | 4 / 90 | (running) | | |
+| v11a | v6 + placement / flat-object README text | 4 / 45 | 3/9 | 6/9 | 4/9 |
+| v11b | v6 + phase-checklist prompt | 4 / 45 | 2/9 | 8/9 | 5/9 |
 | dev7t | v7 + Qwen thinking | 4 / 90 | stopped: 4–9 min per turn (up to 5.6k reasoning tokens), 0/2 | | |
+
+(v11a/v11b were meant to run at 90 min; a stale launcher rewrote the launch script, so they ran at 45 —
+the same condition as dev6b-v6, which is their fair comparison: 3/9 and 2/9 against 3/9.)
 
 What round 2 established:
 
@@ -209,6 +212,14 @@ What round 2 established:
   (the model drops it during the carry or drives the arm into the sink rim / drawer front while
   lowering, then falls into a re-grasp loop); 2 never reached the object (base wandering after the
   object was measured out of reach).
+
+Bottom line after ~30 hours of runs (≈ 150 episodes): the agent-as-policy interface takes this model from
+0/9 to a stable ~⅓ on the development starts; the first four interface changes (region deproject, loop
+breaking, held verdict, empty-close handling) account for all of that gain; the ten changes tried after
+v6 — five guards, three interface primitives, two physical changes, two prompt rewrites — move the number
+within ±2 of 9 and cannot be told apart from run-to-run variance. Getting further needs either a stronger
+model on the same interface or a sample size that a 45-minute episode budget cannot afford on one GPU
+(a 90-episode matrix per arm is ~30 h at two concurrent episodes).
 
 Contaminated run, not counted: the first A/B launch had two matrix launchers writing the same
 directories (`matrix/v11{a,b}-contaminated`). A real defect found there: an `exec` timeout crashed the
