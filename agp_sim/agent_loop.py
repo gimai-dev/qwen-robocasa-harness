@@ -297,7 +297,10 @@ class Agent:
                 out += ("\n[stderr]\n" + p.stderr)
             out += f"\n[exit {p.returncode}]"
         except subprocess.TimeoutExpired as e:
-            out = (e.stdout or "") + f"\n[killed after {timeout}s]"
+            partial = e.stdout or ""
+            if isinstance(partial, bytes):
+                partial = partial.decode(errors="replace")
+            out = partial + f"\n[killed after {timeout}s]"
         if len(out) > MAX_OUTPUT:
             out = out[: MAX_OUTPUT // 2] + f"\n...[{len(out) - MAX_OUTPUT} chars omitted]...\n" + out[-MAX_OUTPUT // 2:]
         self.usage["exec_calls"] += 1
