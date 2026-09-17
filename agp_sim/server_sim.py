@@ -52,6 +52,7 @@ MAX_PATH_WAYPOINTS = 8
 CAMS = ("left", "right", "wrist")
 SLOT_STEPS = 64
 MAX_SLOTS = 8
+BASE_CMD_LIMIT = 10           # base motions per episode: successful runs use <= 4, wandering runs 40-290
 CARRY_JOINT_STEP = 0.03       # rad per sim step while an object is held (0.6 rad/s vs the free 1.6 rad/s): no flinging
 SETTLE_TOL_RAD = 0.03
 CONTACT_FORCE_N = 15.0
@@ -140,6 +141,7 @@ class Server:
         self.counted = 0
         self.free_streak = 0
         self.carrying = False          # a close reported held=true and the gripper has not been opened since
+        self.base_cmds = 0
         self.interface = str(getattr(a, "interface", "full") or "full")
         if self.interface not in INTERFACES:
             raise BootError(f"--interface must be one of {sorted(INTERFACES)}")
@@ -794,6 +796,12 @@ class Server:
         if cmd not in FREE_CMDS:
             if self.counted >= self.budget:
                 return {"ok": False, "error": f"hard command budget ({self.budget}) exhausted", "error_code": "BUDGET"}
+            if cmd in ("move_base", "approach_base"):
+                if self.base_cmds >= BASE_CMD_LIMIT:
+                    return {"ok": False, "error_code": "BASE_LIMIT",
+                            "error": f"the base has already moved {self.base_cmds} times this session, the maximum. Work from where the "
+                                     "base stands now: take frames, re-measure, and use the arm (targets within ~0.7 m horizontally)"}
+                self.base_cmds += 1
             self.counted += 1
             self.free_streak = 0
         elif cmd == "deproject":

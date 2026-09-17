@@ -80,6 +80,8 @@ times out, check server liveness with `tail -3 server.log` and retry once.
 
 ## Moving the base
 
+The base may move at most 10 times per session (`move_base` and
+`approach_base` calls together); after that the arm must do the rest.
 Every pose and every `deproject` result is in the base frame, so **after any
 base motion all coordinates you measured before are wrong**: the response
 says `coordinates_stale: true`. Take `frames` and re-measure before the next
