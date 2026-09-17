@@ -173,6 +173,47 @@ gains from chunking motion into longer commands are eaten by the loss of per-ste
 are 0–4 out of 9, so only the joint-space result (0/9 with 2/9 approach against 9/9) is clearly
 separated from the baseline.
 
+## Round 2 (2026-09-16 evening → 09-17): more improvements, and a variance check
+
+Every matrix below is the same 3 tasks × seeds 0–2. "clients" = concurrent episodes sharing the vLLM
+(each doubles the model's latency); "wall" = wall-clock cap per episode. The 160-turn cap is the same
+everywhere.
+
+| run | configuration | clients / wall | official | approach | lift |
+|---|---|---|---|---|---|
+| dev6 | v6 | 2 / 45 | 4/9 | 9/9 | 7/9 |
+| dev6b-v6 | v6 replicate | 4 / 45 | 3/9 | 7/9 | 5/9 |
+| v6-w90 | v6 replicate | 4 / 90 | 2/9 | 7/9 | 7/9 |
+| dev6b-v6c | v6 + base motions capped at 10 | 4 / 45 | 1/9 | 6/9 | 4/9 |
+| dev7 | v7 = v6 + `check_pose`, drop detection, re-observe after 2 failed moves | 4 / 45 | 2/9 | 7/9 | 5/9 |
+| dev8 | v8 = v7 + `approach_base`, stale-coordinate warnings, carry-height text | 4 / 45 | 2/9 | 7/9 | 4/9 |
+| dev9 | v9 = v8 + slow joint tracking while carrying | 4 / 45 | 0/9 | 9/9 | 3/9 |
+| v11c | v6 + slow carry only | 4 / 90 | 2/9 | 6/9 | 5/9 |
+| v11a | v6 + placement / flat-object README text | 4 / 90 | (running) | | |
+| v11b | v6 + phase-checklist prompt | 4 / 90 | (running) | | |
+| dev7t | v7 + Qwen thinking | 4 / 90 | stopped: 4–9 min per turn (up to 5.6k reasoning tokens), 0/2 | | |
+
+What round 2 established:
+
+- **v6's 4/9 was a favourable draw.** Three independent v6 runs give 9/27 (33%); single-change arms on
+  9 starts land anywhere in 0–4 and cannot be separated from that. None of the round-2 changes shows a
+  gain above this noise, and none of the additional guards (base cap, forced re-observation, macros,
+  longer trajectories) helped.
+- **The load confound.** Runs with four concurrent episodes take about twice as long per turn; with the
+  45-minute wall clock most failures then end on wall clock rather than the turn cap, which handicapped
+  dev7–dev9 and the first replicate. The 90-minute control (v6-w90, 2/9) shows the handicap is not the
+  whole story: v6 at full turn budget is still around 2–4 of 9.
+- **Thinking is not usable here**: Qwen3.8's reasoning runs to thousands of tokens per turn on this
+  task; the two finished episodes lifted the object and ran out of time placing it.
+- **Where the remaining failures are** (v6-w90): 5 of 7 failures lifted the object and did not place it
+  (the model drops it during the carry or drives the arm into the sink rim / drawer front while
+  lowering, then falls into a re-grasp loop); 2 never reached the object (base wandering after the
+  object was measured out of reach).
+
+Contaminated run, not counted: the first A/B launch had two matrix launchers writing the same
+directories (`matrix/v11{a,b}-contaminated`). A real defect found there: an `exec` timeout crashed the
+agent loop (bytes/str), fixed in `agent_loop.py`.
+
 ## Limitations
 
 - Qwen3.8-27B needs harness-level loop breaking that frontier coding agents do not; those guards
