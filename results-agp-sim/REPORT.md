@@ -239,17 +239,31 @@ All round-3 matrices: 4 concurrent episodes, 90-minute wall clock, 160 turns.
 |---|---|---|---|---|
 | v12a | v6 + context reset | 5/9 | 8/9 | 7/9 |
 | v12b | v6 + context reset (replicate) | 4/9 | 9/9 | 8/9 |
-| v12c | v6 + context reset (replicate 3) | (running) | | |
+| v12c | v6 + context reset (replicate 3) | 1/9 | 8/9 | 6/9 |
 | v6-w90 | v6 control | 2/9 | 7/9 | 7/9 |
 | v6-w90b | v6 control | 4/9 | 9/9 | 8/9 |
 | v6-w90c | v6 control | 0/9 | 4/9 | 3/9 |
-| v6-w90d | v6 control | (running) | | |
+| v6-w90d | v6 control | 0/9 | 8/9 | 5/9 |
 
-Interim: v12 **9/18 (50%)** against v6 6/27 (22%) under identical conditions, or 13/45 (29%) over every v6
-run. Resets fired in most non-trivial episodes (0–3 per episode); the successes after a reset are episodes
-that would previously have run to the turn cap in a re-grasp or re-aim loop. This is the only change in
-three rounds whose effect is larger than the run-to-run spread; the third pair (v12c, v6-w90d) is running
-to bring it to 27 vs 36 episodes.
+Final: v12 **10/27 (37%)** against v6 **6/36 (17%)** under identical conditions (four concurrent
+episodes, 90-minute wall clock), or 13/54 (24%) over every v6 run. The third replicate regressed (1/9
+against 0/9 for its control), so the spread is still large: the 90-minute v6 controls range 0–4 of 9 and
+the v12 runs 1–5 of 9. Taken together the reset roughly doubles the success rate on these starts; a
+Fisher test on 10/27 vs 6/36 gives p ≈ 0.08, so this is a strong lead rather than a settled result.
+Resets fired in most non-trivial episodes (0–3 per episode), and the successes after a reset are episodes
+that would otherwise have run to the turn cap inside a re-grasp or re-aim loop. It is the only change in
+three rounds whose effect is larger than the run-to-run spread, and it is the cheapest: about forty lines
+in `agent_loop.py`, no change to the robot interface.
+
+Where v12 still fails (v12c): five of eight failures lifted the object and did not place it (release
+point inside the sink rim or drawer front, then re-grasp loops after a drop), three touched without a
+grasp. The placement stage is the next target; none of the placement guidance tried in round 2 (README
+text, macros, slow carry) moved it, so the next candidate is a reset-style handoff specialised for the
+placement phase (release from above, then verify), or a stronger model on the same interface.
+
+Per-episode tables: `results-agp-sim/round3/`. The tested v12 is the v6 code (commit 94baea1) plus the reset;
+the reset is now also in the main `agp_sim/agent_loop.py` (on by default, `--reset-after 0` disables it),
+on top of the round-2 server primitives, which tested neutral.
 
 ## Limitations
 

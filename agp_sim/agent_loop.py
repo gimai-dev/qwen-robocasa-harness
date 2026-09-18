@@ -53,6 +53,9 @@ TOOLS = [
         "parameters": {"type": "object", "properties": {"path": {"type": "string"}}, "required": ["path"]}}},
 ]
 
+RESET_AFTER_NUDGES = 3        # v12: loop events since the last reset that trigger a fresh context (0 disables)
+MAX_RESETS = 4
+RESET_TEMPERATURE = 0.5
 MAX_OUTPUT = 6000
 MAX_IMAGES = 8
 CTX_SOFT = 44000
@@ -119,7 +122,7 @@ class Agent:
         self.failed_moves = 0                      # consecutive motion commands that returned ok:false
         self.recent_targets: list = []             # move_ee target positions of consecutive move commands
         self.usage = {"requests": 0, "prompt_tokens": 0, "completion_tokens": 0, "latency_s": 0.0, "max_prompt_tokens": 0,
-                      "tool_calls": 0, "exec_calls": 0, "view_image_calls": 0, "compactions": 0, "errors": 0}
+                      "tool_calls": 0, "exec_calls": 0, "view_image_calls": 0, "compactions": 0, "errors": 0, "resets": 0}
         env = dict(os.environ)
         env["HOME"] = str(self.session)
         env["PYTHONDONTWRITEBYTECODE"] = "1"
@@ -136,6 +139,10 @@ class Agent:
         self.n_images = 0
         self.recent_cmds: list[str] = []      # exec command lines, for loop detection
         self.nudges_sent = 0
+        self.resets = 0                # context resets performed (v12: fresh context after persistent loops)
+        self.nudges_since_reset = 0
+        self.prompt_text = ""
+        self.reset_after = RESET_AFTER_NUDGES
 
     # ---------- events ----------
     def _event(self, kind, **payload):
@@ -463,7 +470,59 @@ class Agent:
         return msg, int(u.get("prompt_tokens", 0))
 
     # ---------- main loop ----------
+    def _context_reset(self):
+        """Start a fresh conversation inside the same episode (the robot and the session files persist),
+        carrying only a compact handoff: the task, plan.md, the live state, the last actions and their
+        results. Degenerate loops are held in place by the repeated exchanges in context; a fresh context
+        with 'those actions did not work' is the strongest loop breaker available without a new model."""
+        self.resets += 1
+        self.nudges_since_reset = 0
+        self.consecutive_nudges = 0
+        self.require_action = False
+        self.required_cmds = None
+        self.recent_cmds = []
+        self.recent_targets = []
+        self.empty_closes = 0
+        self.failed_moves = 0
+        # what the previous instance tried last (from the message history, before it is discarded)
+        tried = []
+        for m in self.messages:
+            if m.get("role") == "assistant" and m.get("tool_calls"):
+                for tc in m["tool_calls"]:
+                    try:
+                        cmd = json.loads(tc["function"]["arguments"]).get("command", "")
+                    except Exception:  # noqa: BLE001
+                        cmd = ""
+                    if "robot_client" in cmd:
+                        tried.append(cmd.strip().replace("\n", " ")[:160])
+        tried = tried[-8:]
+        plan = ""
+        pp = self.session / "scratch" / "plan.md"
+        if pp.exists():
+            plan = pp.read_text(errors="replace")[-3000:]
+        state = ""
+        try:
+            r = subprocess.run(["bash", "-lc", "python3 robot_client.py . state"], cwd=self.session, env=self.env,
+                               capture_output=True, text=True, timeout=60)
+            state = r.stdout.strip()[:800]
+        except Exception:  # noqa: BLE001
+            pass
+        handoff = (self.prompt_text + "\n\n## Handoff from your previous instance\n\n"
+                   "You are a FRESH instance continuing an episode that an earlier instance of you started. The robot, the "
+                   "scene and every file under scratch/ and frames/ are exactly as it left them. Its plan notes "
+                   "(scratch/plan.md):\n\n" + (plan or "(no plan.md was written)") +
+                   "\n\nThe live robot state now:\n" + (state or "(unavailable)") +
+                   "\n\nThe last robot commands it issued, which did NOT achieve the goal and must NOT be repeated as they are:\n" +
+                   "\n".join("- " + t for t in tried) +
+                   "\n\nStart by taking `frames`, viewing the images and re-measuring what matters; then choose a DIFFERENT "
+                   "approach from the one above (a different grasp point, height, tool roll, or release point). "
+                   "Do not re-read the history; act on the scene as it is now.")
+        self.messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": handoff}]
+        self.temperature = max(self.temperature, RESET_TEMPERATURE)
+        self._event("context_reset", n=self.resets, tried=tried, plan_chars=len(plan), temperature=self.temperature)
+
     def run(self, prompt: str):
+        self.prompt_text = prompt
         self.messages = [{"role": "system", "content": SYSTEM}, {"role": "user", "content": prompt}]
         t_start = _now()
         nudges = 0
@@ -513,9 +572,14 @@ class Agent:
             if note:
                 self.messages.append({"role": "user", "content": note})
                 self.nudges_sent += 1
+                self.nudges_since_reset += 1
                 self._event("nudge", note=note)
+                if self.reset_after and self.nudges_since_reset >= self.reset_after and self.resets < MAX_RESETS:
+                    self._context_reset()
+                    continue
             if ptok > self.ctx_soft:
                 self._compact()
+        self.usage["resets"] = self.resets
         self.usage["wall_s"] = round(_now() - t_start, 1)
         self.usage["turns"] = self.usage["requests"]
         self.usage["outcome"] = outcome
@@ -544,6 +608,7 @@ def main():
     ap.add_argument("--max-images", type=int, default=MAX_IMAGES)
     ap.add_argument("--python-bin", default=None, help="interpreter exposed as python3 inside the session (numpy/PIL/scipy/cv2)")
     ap.add_argument("--thinking", action="store_true", help="enable Qwen thinking (reasoning is logged, not shown to the tools)")
+    ap.add_argument("--reset-after", type=int, default=RESET_AFTER_NUDGES, help="loop events before a context reset (0 = never)")
     a = ap.parse_args()
     session = Path(a.session)
     token = Path(a.token_file).read_text().strip()
@@ -554,6 +619,7 @@ def main():
             model = json.loads(r.read())["data"][0]["id"]
     agent = Agent(session, a.base_url, token, model, max_turns=a.max_turns, wall_s=a.wall_min * 60,
                   temperature=a.temperature, max_images=a.max_images, python_bin=a.python_bin, thinking=a.thinking)
+    agent.reset_after = a.reset_after
     prompt = (session / a.prompt).read_text()
     outcome = agent.run(prompt)
     print(json.dumps({"outcome": outcome, **agent.usage}))

@@ -121,6 +121,7 @@ def main():
     ap.add_argument("--sim-python", default=SIM_PY)
     ap.add_argument("--interface", default="full", help="server interface variant: full | joint | path | macro")
     ap.add_argument("--thinking", action="store_true")
+    ap.add_argument("--reset-after", type=int, default=3, help="loop events before a context reset (v12); 0 disables")
     a = ap.parse_args()
 
     out = Path(a.out).resolve()
@@ -168,13 +169,14 @@ def main():
     (session / "goal" / "INSTRUCTION.md").write_text(instruction + "\n")
     (out / "episode.json").write_text(json.dumps({"task": a.task, "seed": a.seed, "instruction": instruction, "budget": a.budget,
                                                   "wall_min": a.wall_min, "max_turns": a.max_turns, "temperature": a.temperature,
-                                                  "image_size": a.image_size, "max_images": a.max_images, "interface": a.interface, "thinking": a.thinking,
+                                                  "image_size": a.image_size, "max_images": a.max_images, "interface": a.interface, "thinking": a.thinking, "reset_after": a.reset_after,
                                                   "prompt_file": a.prompt, "readme_file": a.readme, "started": t_start}, indent=1))
 
     # 3. the agent
     token = Path(a.token_file).read_text().strip()
     agent = Agent(session, a.base_url, token, None, max_turns=a.max_turns, wall_s=a.wall_min * 60,
                   temperature=a.temperature, max_images=a.max_images, python_bin=a.sim_python, log_dir=out, thinking=a.thinking)
+    agent.reset_after = a.reset_after
     import urllib.request
     req = urllib.request.Request(a.base_url.rstrip("/") + "/models", headers={"Authorization": f"Bearer {token}"})
     with urllib.request.urlopen(req, timeout=30) as r:
