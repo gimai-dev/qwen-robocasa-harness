@@ -225,6 +225,32 @@ Contaminated run, not counted: the first A/B launch had two matrix launchers wri
 directories (`matrix/v11{a,b}-contaminated`). A real defect found there: an `exec` timeout crashed the
 agent loop (bytes/str), fixed in `agent_loop.py`.
 
+## Round 3 (2026-09-17 17:50 → 09-18): context reset — the first change with a signal
+
+**v12 = v6 + context reset.** Qwen's degenerate loops are held in place by the repeated exchanges in its
+context; deleting a few and adding notes (v3–v6) did not break them. v12 instead ends the conversation
+after three loop events in a row and starts a fresh one inside the same episode, carrying only a compact
+handoff: the task, `scratch/plan.md`, the live robot `state`, and the last eight robot commands marked
+"these did not work, do not repeat them"; temperature rises from 0.3 to 0.5; at most four resets per
+episode. This is the simulation analogue of the paper's per-cycle fresh agents with a carried checkpoint.
+All round-3 matrices: 4 concurrent episodes, 90-minute wall clock, 160 turns.
+
+| run | configuration | official | approach | lift |
+|---|---|---|---|---|
+| v12a | v6 + context reset | 5/9 | 8/9 | 7/9 |
+| v12b | v6 + context reset (replicate) | 4/9 | 9/9 | 8/9 |
+| v12c | v6 + context reset (replicate 3) | (running) | | |
+| v6-w90 | v6 control | 2/9 | 7/9 | 7/9 |
+| v6-w90b | v6 control | 4/9 | 9/9 | 8/9 |
+| v6-w90c | v6 control | 0/9 | 4/9 | 3/9 |
+| v6-w90d | v6 control | (running) | | |
+
+Interim: v12 **9/18 (50%)** against v6 6/27 (22%) under identical conditions, or 13/45 (29%) over every v6
+run. Resets fired in most non-trivial episodes (0–3 per episode); the successes after a reset are episodes
+that would previously have run to the turn cap in a re-grasp or re-aim loop. This is the only change in
+three rounds whose effect is larger than the run-to-run spread; the third pair (v12c, v6-w90d) is running
+to bring it to 27 vs 36 episodes.
+
 ## Limitations
 
 - Qwen3.8-27B needs harness-level loop breaking that frontier coding agents do not; those guards
